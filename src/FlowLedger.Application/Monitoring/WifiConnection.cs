@@ -8,8 +8,11 @@ public enum WifiConnectionState
     Unavailable,
 }
 
-/// <summary>Current local display only. Not a permanent network identity or historical attribution.</summary>
-public sealed record WifiConnection(WifiConnectionState State, string? DisplayName = null, uint ErrorCode = 0);
+/// <summary>Current local connection evidence; never read profile credentials.</summary>
+public sealed record WifiConnection(
+    WifiConnectionState State, string? DisplayName = null, uint ErrorCode = 0,
+    string? SsidHex = null, string? ProfileName = null, string? AccessPoint = null,
+    uint BssType = 0, uint Authentication = 0, uint Cipher = 0);
 
 public interface IWifiConnectionReader
 {

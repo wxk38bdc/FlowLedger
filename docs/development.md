@@ -25,6 +25,7 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --diagnose
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --sample 5
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-counters 5
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --route-summary
 ```
 
 命令行无参数时显示帮助，不启动采集。`--diagnose` 输出系统、运行时、逻辑处理器数量及按接口类型/Up 状态分组的数量；不输出接口名称/标识、IP/MAC、SSID、服务器或进程信息。数量可能包含虚拟和过滤层接口，不能证明已识别物理出口。
@@ -33,9 +34,13 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 
 可选 `--probe-wifi` 仅查询在线硬件 WLAN 的当前连接并输出状态和错误码，不输出名称、BSSID 或 SSID；Windows 可能提示位置权限。不自动操作该提示，不修改权限、不触发网络扫描；无适用接口时退出 1。返回 Available/AccessDenied/Disconnected/Unavailable 是能力结果，不能单凭退出码 0 认定名称可用。
 
+可选 `--watch-wifi <1..60>` 订阅 ACM/MSM 通知，在接口读取前后查询连接信息，输出匿名分区和 PartitionsMatch。退出时 using 释放监听器。权限不足时仍可输出未识别网络字节；没有可观察的硬件 WLAN 或有效区间时退出 1。Coverage=Full 仅表示成功注册两个通知源，不能单凭它证明所有事件完整送达。该命令与桌面“启用 Wi-Fi 分账”均为显式操作；CI 不执行它们，避免触发位置权限提示。网络名、配置名、原始 SSID 和 BSSID 不进入 CLI 输出。
+
+`--route-summary` 返回匿名逐接口路由证据，只包含类型及默认/其他前缀条目数；不是路由选择或应用出口判定。无需断网的验证可重复运行 watch-wifi、route-summary 和 verify-counters，但不能以此代替真正网络切换和睡眠恢复。
+
 退出码：0 表示帮助、诊断/采样成功或探测获得结果；1 表示读取失败、无适用数据或参考校验不通过；2 表示参数无效。`--diagnose` 的接口清单不可用输出为 Unavailable，空列表不表示没有网卡。
 
-单元测试包括领域计数/会话规则、应用协调器的接口隔离和生命周期，以及 Windows SDK ABI、类型/标志分类、Wi-Fi 失败和原生读取。CI 额外执行一秒采样，但不要求托管 runner 存在真实物理硬件，不执行 Wi-Fi 名称查询或网络设置操作。
+单元测试包括领域计数/会话规则、应用协调器的接口隔离和生命周期、Windows SDK ABI、类型/标志分类、Wi-Fi 失败和原生读取，以及真实桌面视图模型的异步启停/退出时序（使用合成数据源，无需创建窗口）。Windows.Tests 因引用 Desktop 使用 Windows Desktop Runtime。CI 额外执行一秒采样，但不要求托管 runner 存在真实物理硬件，不执行 Wi-Fi 名称查询或网络设置操作。
 
 ## 本地桌面版本
 

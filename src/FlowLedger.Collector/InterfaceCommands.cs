@@ -66,6 +66,71 @@ internal static class InterfaceCommands
         return snapshot.ErrorCode == 0 && states.Length > 0 ? 0 : 1;
     }
 
+    public static async Task<int> WatchWifiAsync(int seconds)
+    {
+        using var source = new WindowsWifiTrafficSource(new WindowsInterfaceCounterReader());
+        var monitor = new InterfaceMonitor();
+        var coordinator = new WifiLedgerCoordinator();
+        var sample = source.Read();
+        var result = coordinator.Apply(sample, monitor.Apply(sample.Counters));
+        var errors = sample.Counters.ErrorCode == 0 ? 0 : 1;
+        for (var i = 0; i < seconds; i++)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            sample = source.Read();
+            errors += sample.Counters.ErrorCode == 0 ? 0 : 1;
+            result = coordinator.Apply(sample, monitor.Apply(sample.Counters));
+        }
+
+        var partitionsMatch = result.Values.All(ledger => ledger.ObservedTotal is null ||
+            ledger.Networks.Aggregate(default(TrafficVolume), (sum, network) => sum.Add(network.Volume))
+                .Add(ledger.BoundaryUnallocated).Add(ledger.Unidentified) == ledger.ObservedTotal);
+        Write(new
+        {
+            DurationSeconds = seconds,
+            sample.Coverage,
+            sample.NotificationError,
+            CounterReadFailures = errors,
+            PartitionsMatch = partitionsMatch,
+            ConnectionStates = sample.Observations.Values.GroupBy(value => value.State)
+                .Select(group => new { State = group.Key, Count = group.Count() }),
+            Interfaces = result.Values.Select((ledger, index) => new
+            {
+                Slot = index + 1,
+                ledger.ObservedTotal,
+                Networks = ledger.Networks.Select((network, slot) => new { Slot = slot + 1, network.Volume }),
+                ledger.BoundaryUnallocated,
+                ledger.Unidentified,
+                ledger.BoundaryIntervals,
+                ledger.UnidentifiedIntervals,
+            }),
+            Note = "In-memory candidate accounting only. No network names, identifiers, profile names, BSSIDs or addresses are printed. Full notification registration does not prove delivery of every event.",
+        });
+        return errors == 0 && partitionsMatch && result.Values.Any(ledger => ledger.ObservedTotal is not null) ? 0 : 1;
+    }
+
+    public static int RouteSummary()
+    {
+        var counters = new WindowsInterfaceCounterReader().Read();
+        var routes = new WindowsRouteEvidenceReader().Read();
+        var kinds = counters.Interfaces.ToDictionary(item => item.Luid, item => item.Kind);
+        Write(new
+        {
+            routes.ErrorCode,
+            InterfaceReadError = counters.ErrorCode,
+            Interfaces = routes.Interfaces.Select((route, index) => new
+            {
+                Slot = index + 1,
+                Kind = kinds.TryGetValue(route.Luid, out var kind) ? kind : (InterfaceKind?)null,
+                route.Ipv4DefaultRoutes,
+                route.Ipv6DefaultRoutes,
+                route.OtherPrefixRoutes,
+            }),
+            Note = "Route-table evidence only; no per-application exit, metric precedence, VPN bypass or Internet reachability inference.",
+        });
+        return routes.ErrorCode == 0 && counters.ErrorCode == 0 ? 0 : 1;
+    }
+
     private static Bracket ReadBracket(WindowsInterfaceCounterReader reader, bool verify)
     {
         var before = verify ? ReadReference() : [];

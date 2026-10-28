@@ -20,6 +20,8 @@ public sealed class InterfaceChoice(MonitoredInterface state) : ObservableState
     public string Id => State.Interface.Id;
     public string Label => $"{State.Interface.Name} · {KindName(State.Interface.Kind)} · {(State.IsPresent ? State.Interface.IsUp ? "在线" : "离线" : "不可用")}";
 
+    public override string ToString() => Label;
+
     public void Update(MonitoredInterface value)
     {
         State = value;
@@ -37,9 +39,20 @@ public sealed class InterfaceChoice(MonitoredInterface state) : ObservableState
 }
 
 public sealed class InterfaceMonitorViewModel(
-    IInterfaceCounterReader reader, IWifiConnectionReader wifiReader) : ObservableState
+    IInterfaceCounterReader reader, IWifiConnectionReader wifiReader,
+    Func<IWifiTrafficSource> wifiSourceFactory, IRouteEvidenceReader routeReader) : ObservableState
 {
     private readonly InterfaceMonitor monitor = new();
+    private readonly WifiLedgerCoordinator wifiLedger = new();
+    private readonly SemaphoreSlim samplingGate = new(1, 1);
+    private IWifiTrafficSource? wifiSource;
+    private IReadOnlyDictionary<string, WifiLedgerSnapshot> wifiLedgers = new Dictionary<string, WifiLedgerSnapshot>();
+    private IReadOnlyDictionary<string, WifiTrafficObservation> wifiObservations = new Dictionary<string, WifiTrafficObservation>();
+    private bool changingWifiMode;
+    private bool shuttingDown;
+    private string wifiModeStatus = "尚未启用 Wi-Fi 分账；启用时 Windows 可能提示位置权限。";
+    private string routeInfo = "尚未检查出口关系。此检查不修改路由。";
+    private bool routeBusy;
     private readonly Dictionary<string, InterfaceChoice> choices = new(StringComparer.Ordinal);
     private InterfaceChoice? selectedInterface;
     private bool refreshing;
@@ -63,6 +76,7 @@ public sealed class InterfaceMonitorViewModel(
             }
 
             selectedInterface = value;
+            routeInfo = "所选接口已变更，请重新检查出口关系。";
             ClearWifi();
             Notify(null);
         }
@@ -75,6 +89,33 @@ public sealed class InterfaceMonitorViewModel(
     public string DownloadTotal => Volume(selectedInterface?.State.Usage.SessionTotal?.ReceivedBytes);
     public string UploadTotal => Volume(selectedInterface?.State.Usage.SessionTotal?.SentBytes);
     public string WifiInfo => wifiInfo;
+    public string WifiModeStatus => wifiModeStatus;
+    public bool CanEnableWifi => !changingWifiMode && wifiSource is null && !shuttingDown;
+    public bool CanDisableWifi => !changingWifiMode && wifiSource is not null;
+    public string RouteInfo => routeInfo;
+    public bool CanReadRoutes => !routeBusy;
+
+    public string WifiAllocationSummary => selectedInterface is null || !wifiLedgers.TryGetValue(selectedInterface.Id, out var ledger)
+        ? "选择物理 Wi-Fi 接口并启用分账后，等待建立基线。"
+        : $"分账启用期间的有效区间：下载 {Volume(ledger.ObservedTotal?.ReceivedBytes)} · 上传 {Volume(ledger.ObservedTotal?.SentBytes)}\n边界区间 {ledger.BoundaryIntervals} 次 · 未识别区间 {ledger.UnidentifiedIntervals} 次；计数断档没有可分配字节。";
+
+    public IReadOnlyList<WifiNetworkRow> WifiRows
+    {
+        get
+        {
+            if (selectedInterface is null || !wifiLedgers.TryGetValue(selectedInterface.Id, out var ledger) || ledger.ObservedTotal is null)
+            {
+                return [];
+            }
+
+            return ledger.Networks.Select((network, index) => new WifiNetworkRow(
+                $"候选 {index + 1} · {network.DisplayName}", Volume(network.Volume.ReceivedBytes), Volume(network.Volume.SentBytes)))
+                .Concat([
+                    new WifiNetworkRow("边界未分配", Volume(ledger.BoundaryUnallocated.ReceivedBytes), Volume(ledger.BoundaryUnallocated.SentBytes)),
+                    new WifiNetworkRow("未识别网络", Volume(ledger.Unidentified.ReceivedBytes), Volume(ledger.Unidentified.SentBytes)),
+                ]).ToArray();
+        }
+    }
     public bool CanReadWifi => !wifiBusy && selectedInterface is { State.IsPresent: true, State.Interface.IsUp: true, State.Interface.NativeType: 71 }
         && selectedInterface.State.Interface.Kind == InterfaceKind.Hardware
         && Guid.TryParse(selectedInterface.Id, out _);
@@ -93,23 +134,49 @@ public sealed class InterfaceMonitorViewModel(
         }
 
         refreshing = true;
-        var generation = continuityGeneration;
+        await samplingGate.WaitAsync();
         try
         {
-            var raw = await Task.Run(reader.Read);
+            if (shuttingDown)
+            {
+                return;
+            }
+
+            var generation = continuityGeneration;
+            var sample = wifiSource is { } source ? await Task.Run(source.Read) : null;
+            var raw = sample?.Counters ?? await Task.Run(reader.Read);
             if (generation == continuityGeneration)
             {
-                Apply(monitor.Apply(raw));
+                var monitored = monitor.Apply(raw);
+                if (sample is not null)
+                {
+                    var oldSequence = selectedInterface is not null && wifiObservations.TryGetValue(selectedInterface.Id, out var old)
+                        ? old.Endpoint.ChangeSequence : (long?)null;
+                    wifiObservations = sample.Observations;
+                    wifiLedgers = wifiLedger.Apply(sample, monitored);
+                    wifiModeStatus = sample.Coverage == WifiNotificationCoverage.Full
+                        ? "Wi-Fi 分账运行中 · 连接变化通知正常 · 仅保留本次运行记录"
+                        : $"Wi-Fi 通知受限（错误 {sample.NotificationError}）；有效字节计入未识别网络。";
+                    if (selectedInterface is not null && wifiObservations.TryGetValue(selectedInterface.Id, out var current) &&
+                        (oldSequence != current.Endpoint.ChangeSequence || current.State != WifiConnectionState.Available))
+                    {
+                        ClearWifi();
+                    }
+                }
+
+                Apply(monitored);
             }
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException or OverflowException)
         {
+            wifiLedger.BreakContinuity();
             Apply(monitor.Apply(new(DateTimeOffset.UtcNow, TimeSpan.Zero, [], 13)));
             collectionStatus = "采集异常；当前速率不可用，恢复后重新建立基线。";
             Notify(null);
         }
         finally
         {
+            samplingGate.Release();
             refreshing = false;
         }
     }
@@ -118,8 +185,86 @@ public sealed class InterfaceMonitorViewModel(
     {
         continuityGeneration++;
         monitor.BreakContinuity();
+        wifiLedger.BreakContinuity();
         ClearWifi();
         Apply(monitor.Apply(new(DateTimeOffset.UtcNow, TimeSpan.Zero, [], 21)));
+    }
+
+    public async Task SetWifiEnabledAsync(bool enabled)
+    {
+        if (changingWifiMode || shuttingDown)
+        {
+            return;
+        }
+
+        changingWifiMode = true;
+        Notify(null);
+        await samplingGate.WaitAsync();
+        try
+        {
+            if (enabled && wifiSource is null)
+            {
+                wifiSource = await Task.Run(wifiSourceFactory);
+                wifiModeStatus = "Wi-Fi 分账已启用，等待首次连接观察；系统可能提示位置权限。";
+            }
+            else if (!enabled && wifiSource is { } source)
+            {
+                wifiSource = null;
+                await Task.Run(source.Dispose);
+                wifiModeStatus = "Wi-Fi 分账已暂停，保留本次已有记录；接口采样继续运行。";
+            }
+
+            wifiLedger.BreakContinuity();
+        }
+        finally
+        {
+            samplingGate.Release();
+            changingWifiMode = false;
+            Notify(null);
+        }
+    }
+
+    public async Task ShutdownAsync()
+    {
+        shuttingDown = true;
+        await samplingGate.WaitAsync();
+        try
+        {
+            if (wifiSource is { } source)
+            {
+                wifiSource = null;
+                await Task.Run(source.Dispose);
+            }
+        }
+        finally
+        {
+            samplingGate.Release();
+        }
+    }
+
+    public async Task ReadRoutesAsync()
+    {
+        if (routeBusy)
+        {
+            return;
+        }
+
+        routeBusy = true;
+        Notify(null);
+        try
+        {
+            var routes = await Task.Run(routeReader.Read);
+            var row = routes.Interfaces.FirstOrDefault(item => item.Luid == selectedInterface?.State.Interface.Luid);
+            routeInfo = routes.ErrorCode != 0 ? $"路由信息不可用（错误 {routes.ErrorCode}）。"
+                : $"全机存在默认路由的接口：{routes.Interfaces.Count(item => item.Ipv4DefaultRoutes + item.Ipv6DefaultRoutes > 0)} 个\n"
+                  + (row is null ? "所选接口没有可见路由条目。" : $"所选接口：IPv4 默认路由 {row.Ipv4DefaultRoutes} 条 · IPv6 默认路由 {row.Ipv6DefaultRoutes} 条 · 其他前缀路由 {row.OtherPrefixRoutes} 条")
+                  + "\n这是本次路由表证据，不能据此判定每个应用的实际出口；VPN 分流也可能使用更具体的前缀。";
+        }
+        finally
+        {
+            routeBusy = false;
+            Notify(null);
+        }
     }
 
     public async Task ReadWifiAsync()
@@ -160,6 +305,7 @@ public sealed class InterfaceMonitorViewModel(
     private void Apply(InterfaceMonitorSnapshot snapshot)
     {
         var oldKey = selectedInterface?.State.Interface.ContinuityKey;
+        var oldContext = selectedInterface?.State.Interface.NetworkContext;
         foreach (var item in snapshot.Interfaces.OrderBy(item => item.Interface.Kind).ThenByDescending(item => item.Interface.IsUp))
         {
             if (!choices.TryGetValue(item.Interface.Id, out var choice))
@@ -181,7 +327,7 @@ public sealed class InterfaceMonitorViewModel(
         }
 
         if (selectedInterface is { } selected &&
-            (!selected.State.IsPresent || !selected.State.Interface.IsUp || selected.State.Interface.ContinuityKey != oldKey))
+            (!selected.State.IsPresent || !selected.State.Interface.IsUp || selected.State.Interface.ContinuityKey != oldKey || selected.State.Interface.NetworkContext != oldContext))
         {
             ClearWifi();
         }
@@ -224,3 +370,5 @@ public sealed class InterfaceMonitorViewModel(
         _ => "采样间隔过长，已重建基线",
     };
 }
+
+public sealed record WifiNetworkRow(string Name, string Download, string Upload);

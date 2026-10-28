@@ -23,6 +23,27 @@ internal static class NativeNetworkMethods
 
     [DllImport("wlanapi.dll", ExactSpelling = true)]
     internal static extern void WlanFreeMemory(IntPtr memory);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate void WifiNotificationCallback(IntPtr notification, IntPtr context);
+
+    [DllImport("wlanapi.dll", ExactSpelling = true)]
+    internal static extern uint WlanRegisterNotification(
+        IntPtr handle, uint source, [MarshalAs(UnmanagedType.Bool)] bool ignoreDuplicate,
+        WifiNotificationCallback? callback, IntPtr context, IntPtr reserved, out uint previousSource);
+
+    [DllImport("iphlpapi.dll", ExactSpelling = true)]
+    internal static extern uint GetIpForwardTable2(ushort family, out IntPtr table);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWifiNotification
+{
+    public uint Source;
+    public uint Code;
+    public Guid InterfaceGuid;
+    public uint DataSize;
+    public IntPtr Data;
 }
 
 // Windows SDK netioapi.h MIB_IF_ROW2. All scalar widths and default 8-byte packing

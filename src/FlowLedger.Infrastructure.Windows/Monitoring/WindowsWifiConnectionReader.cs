@@ -42,8 +42,12 @@ public sealed class WindowsWifiConnectionReader : IWifiConnectionReader
                 return new(WifiConnectionState.Unavailable, ErrorCode: 13);
             }
 
-            return new(WifiConnectionState.Available,
-                DisplaySsid(connection.Association.Ssid.AsSpan(0, (int)connection.Association.SsidLength)));
+            var ssid = connection.Association.Ssid.AsSpan(0, (int)connection.Association.SsidLength);
+            return new(WifiConnectionState.Available, DisplaySsid(ssid),
+                SsidHex: Convert.ToHexString(ssid), ProfileName: connection.Profile,
+                AccessPoint: Convert.ToHexString(connection.Association.Bssid),
+                BssType: connection.Association.BssType,
+                Authentication: connection.Security[2], Cipher: connection.Security[3]);
         }
         finally
         {

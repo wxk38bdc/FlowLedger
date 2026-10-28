@@ -20,7 +20,9 @@ public sealed record InterfaceCounter(
     bool HardwareFlag,
     bool ConnectorPresent,
     string ContinuityKey,
-    CounterReading Reading);
+    CounterReading Reading,
+    Guid NetworkContext = default,
+    ulong Luid = 0);
 
 public sealed record InterfaceCounterSnapshot(
     DateTimeOffset CapturedAt,

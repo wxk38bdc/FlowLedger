@@ -14,6 +14,8 @@ if (args.Length == 0 || args is ["--help"] or ["-h"])
           FlowLedger.Collector --sample <1..60>           Sample interface traffic for N seconds
           FlowLedger.Collector --verify-counters <1..60>  Compare hardware counters with bounded reference reads
           FlowLedger.Collector --probe-wifi               Query Wi-Fi capability; print status only (may prompt)
+          FlowLedger.Collector --watch-wifi <1..60>       Observe Wi-Fi notifications and usage (may prompt)
+          FlowLedger.Collector --route-summary           Print anonymous per-interface route evidence
           FlowLedger.Collector --help       Show this help
 
         Interface samples stay in memory. No service installation or network settings changes.
@@ -26,6 +28,16 @@ if (args.Length == 0 || args is ["--help"] or ["-h"])
 if (args is ["--probe-wifi"])
 {
     return InterfaceCommands.ProbeWifi();
+}
+
+if (args is ["--route-summary"])
+{
+    return InterfaceCommands.RouteSummary();
+}
+
+if (args is ["--watch-wifi", var wifiDuration] && int.TryParse(wifiDuration, out var wifiSeconds) && wifiSeconds is >= 1 and <= 60)
+{
+    return await InterfaceCommands.WatchWifiAsync(wifiSeconds);
 }
 
 if (args is ["--sample" or "--verify-counters", var duration] &&

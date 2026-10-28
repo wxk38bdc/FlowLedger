@@ -34,8 +34,9 @@ public sealed class WindowsInterfaceCounterReader : IInterfaceCounterReader
                 interfaces.Add(new(id, row.Alias, Classify(row.Type, row.Flags), row.Type,
                     row.OperStatus == 1 && row.MediaConnectState != 2 && (row.Flags & 0x78) == 0,
                     (row.Flags & 1) != 0, (row.Flags & 4) != 0,
-                    $"{row.Luid:x16}/{row.NetworkGuid:D}/{row.Index}",
-                    new CounterReading(id, epoch, now, new TrafficVolume(row.InOctets, row.OutOctets))));
+                    $"{row.Luid:x16}/{row.Index}",
+                    new CounterReading(id, epoch, now, new TrafficVolume(row.InOctets, row.OutOctets)),
+                    row.NetworkGuid, row.Luid));
             }
 
             return new(now, elapsed, interfaces);
