@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FlowLedger · 流量簿" Width="1080" Height="740"
         MinWidth="940" MinHeight="640" Background="#F3F6F8" Foreground="#17323D"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" Icon="Assets/FlowLedger.ico">
   <Grid>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="224" />
@@ -17,6 +17,10 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel>
+          <Image Source="Assets/FlowLedger.png" Width="64" Height="64"
+                 HorizontalAlignment="Left" Margin="0,0,0,16"
+                 RenderOptions.BitmapScalingMode="HighQuality"
+                 AutomationProperties.Name="FlowLedger 标志：双向数据流与账本" />
           <TextBlock Text="FlowLedger" FontSize="27" FontWeight="SemiBold" Foreground="#8FE2CB" />
           <TextBlock Text="流量簿" FontSize="16" Foreground="#D7E5EB" Margin="0,8,0,36" />
         </StackPanel>
@@ -59,7 +63,7 @@
         </ListBox>
         <StackPanel Grid.Row="2">
           <TextBlock Text="开发预览" FontSize="13" Foreground="#8FE2CB" />
-          <TextBlock Text="v0.1 · 基础架构" Margin="0,6,0,0" FontSize="12" Foreground="#A9BEC7" />
+          <TextBlock Text="v0.1 · 接口采集验证" Margin="0,6,0,0" FontSize="12" Foreground="#A9BEC7" />
         </StackPanel>
       </Grid>
     </Border>
@@ -76,11 +80,50 @@
                    Margin="0,12,0,28" TextWrapping="Wrap" />
       </StackPanel>
       <Border Grid.Row="1" Background="#E4F3ED" CornerRadius="10" Padding="18,14" Margin="0,0,0,24">
-        <TextBlock Text="尚未启动流量采集 · 当前为基础架构预览" Foreground="#245B4E"
+        <TextBlock Text="{Binding CollectionStatus}" Foreground="#245B4E"
                    FontSize="14" TextWrapping="Wrap" />
       </Border>
-      <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="28" BorderBrush="#DEE7EB" BorderThickness="1">
+      <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="24" BorderBrush="#DEE7EB" BorderThickness="1">
         <Grid>
+          <ScrollViewer x:Name="TrafficPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <TextBlock Text="选择网络接口" FontSize="16" FontWeight="SemiBold" />
+              <ComboBox ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
+                        DisplayMemberPath="Label" Margin="0,10,0,0" Padding="10,8" FontSize="14"
+                        AutomationProperties.Name="选择网络接口" />
+              <TextBlock Text="{Binding InventorySummary}" Foreground="#607885" Margin="0,8,0,18"
+                         TextWrapping="Wrap" FontSize="12" />
+              <UniformGrid Columns="2">
+                <StackPanel Margin="0,0,12,14">
+                  <TextBlock Text="下载速度" Foreground="#607885" />
+                  <TextBlock Text="{Binding DownloadRate}" FontSize="26" FontWeight="SemiBold" Margin="0,6,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,14">
+                  <TextBlock Text="上传速度" Foreground="#607885" />
+                  <TextBlock Text="{Binding UploadRate}" FontSize="26" FontWeight="SemiBold" Margin="0,6,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,12,16">
+                  <TextBlock Text="本次运行 · 下载" Foreground="#607885" />
+                  <TextBlock Text="{Binding DownloadTotal}" FontSize="23" Margin="0,6,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,16">
+                  <TextBlock Text="本次运行 · 上传" Foreground="#607885" />
+                  <TextBlock Text="{Binding UploadTotal}" FontSize="23" Margin="0,6,0,0" />
+                </StackPanel>
+              </UniformGrid>
+              <TextBlock Text="{Binding QualityStatus}" TextWrapping="Wrap" LineHeight="22" FontSize="12" />
+              <Expander Header="接口与 Wi-Fi 信息" Margin="0,16,0,0" IsExpanded="False">
+                <StackPanel Margin="0,12,0,0">
+                  <TextBlock Text="{Binding SelectionDetails}" TextWrapping="Wrap" LineHeight="22" Foreground="#607885" FontSize="12" />
+                  <Button Content="查询所选 Wi-Fi 名称" IsEnabled="{Binding CanReadWifi}" Click="OnReadWifi"
+                          HorizontalAlignment="Left" Margin="0,12,0,10" />
+                  <TextBlock Text="{Binding WifiInfo}" TextWrapping="Wrap" LineHeight="22" FontSize="12" />
+                  <TextBlock Text="此操作只读取当前连接；Windows 可能提示位置权限。"
+                             TextWrapping="Wrap" Foreground="#607885" Margin="0,6,0,0" FontSize="12" />
+                </StackPanel>
+              </Expander>
+            </StackPanel>
+          </ScrollViewer>
           <StackPanel x:Name="EmptyState" VerticalAlignment="Center" MaxWidth="500">
             <TextBlock Text="等待首次记录" FontSize="25" FontWeight="SemiBold" />
             <TextBlock x:Name="EmptyDescription" FontSize="15" Foreground="#607885"
@@ -96,7 +139,7 @@
           </StackPanel>
         </Grid>
       </Border>
-      <TextBlock Grid.Row="3" Text="后续将依次加入 Wi-Fi 分账、应用用量、代理与 SSH 统计。"
+      <TextBlock Grid.Row="3" Text="当前为接口级验证版；Wi-Fi 历史分账、应用、代理及 SSH 归属仍待开发。"
                  Margin="0,22,0,0" FontSize="12" Foreground="#607885" TextWrapping="Wrap" />
     </Grid>
   </Grid>

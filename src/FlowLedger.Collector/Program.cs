@@ -1,21 +1,37 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlowLedger.Application.Diagnostics;
+using FlowLedger.Collector;
 using FlowLedger.Infrastructure.Windows.Diagnostics;
 
 if (args.Length == 0 || args is ["--help"] or ["-h"])
 {
     Console.WriteLine("""
-        FlowLedger collector — foundation build
+        FlowLedger collector — interface validation build
 
         Usage:
           FlowLedger.Collector --diagnose   Print read-only environment metadata as JSON
+          FlowLedger.Collector --sample <1..60>           Sample interface traffic for N seconds
+          FlowLedger.Collector --verify-counters <1..60>  Compare hardware counters with bounded reference reads
+          FlowLedger.Collector --probe-wifi               Query Wi-Fi capability; print status only (may prompt)
           FlowLedger.Collector --help       Show this help
 
-        This build does not collect traffic, install a service, or change network settings.
+        Interface samples stay in memory. No service installation or network settings changes.
+        Names, stable IDs, addresses, SSIDs, and payloads are never printed by these commands.
         Interface counts include virtual/filter entries and are not physical adapter counts.
         """);
     return 0;
+}
+
+if (args is ["--probe-wifi"])
+{
+    return InterfaceCommands.ProbeWifi();
+}
+
+if (args is ["--sample" or "--verify-counters", var duration] &&
+    int.TryParse(duration, out var seconds) && seconds is >= 1 and <= 60)
+{
+    return await InterfaceCommands.SampleAsync(seconds, args[0] == "--verify-counters");
 }
 
 if (args is not ["--diagnose"])

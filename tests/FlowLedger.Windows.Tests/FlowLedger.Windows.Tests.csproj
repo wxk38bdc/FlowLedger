@@ -1,0 +1,9 @@
+<Project Sdk="MSTest.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ExtensionsProfile>None</ExtensionsProfile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/FlowLedger.Infrastructure.Windows/FlowLedger.Infrastructure.Windows.csproj" />
+  </ItemGroup>
+</Project>

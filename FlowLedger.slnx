@@ -8,5 +8,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Application.Tests/FlowLedger.Application.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Windows.Tests/FlowLedger.Windows.Tests.csproj" />
   </Folder>
 </Solution>
