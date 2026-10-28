@@ -1,0 +1,52 @@
+# .NET and IDE outputs
+**/[Bb]in/
+**/[Oo]bj/
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+*.DotSettings.user
+
+# Local build and test artifacts
+artifacts/
+**/TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# Runtime data and private diagnostics
+.local/
+.flowledger/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.etl
+*.cap
+*.pcap
+*.pcapng
+*.dmp
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.local.json
+*.pfx
+*.p12
+*.key
+
+# OS/editor temporary files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*~

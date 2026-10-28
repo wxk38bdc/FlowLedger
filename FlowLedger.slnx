@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlowLedger.Domain/FlowLedger.Domain.csproj" />
+    <Project Path="src/FlowLedger.Application/FlowLedger.Application.csproj" />
+    <Project Path="src/FlowLedger.Infrastructure.Windows/FlowLedger.Infrastructure.Windows.csproj" />
+    <Project Path="src/FlowLedger.Collector/FlowLedger.Collector.csproj" />
+    <Project Path="src/FlowLedger.Desktop/FlowLedger.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
