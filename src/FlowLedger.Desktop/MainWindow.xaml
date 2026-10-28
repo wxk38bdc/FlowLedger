@@ -63,7 +63,7 @@
         </ListBox>
         <StackPanel Grid.Row="2">
           <TextBlock Text="开发预览" FontSize="13" Foreground="#8FE2CB" />
-          <TextBlock Text="v0.1 · Wi-Fi 分账验证" Margin="0,6,0,0" FontSize="12" Foreground="#A9BEC7" />
+          <TextBlock Text="v0.1 · 应用采集验证" Margin="0,6,0,0" FontSize="12" Foreground="#A9BEC7" />
         </StackPanel>
       </Grid>
     </Border>
@@ -155,6 +155,31 @@
               </Expander>
             </StackPanel>
           </ScrollViewer>
+          <ScrollViewer x:Name="ApplicationPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <TextBlock Text="{Binding Status}" TextWrapping="Wrap" LineHeight="22" />
+              <WrapPanel Margin="0,12,0,16">
+                <Button Content="开始应用统计" Click="OnStartApplications" IsEnabled="{Binding CanStart}" Margin="0,0,10,6" />
+                <Button Content="停止应用统计" Click="OnStopApplications" IsEnabled="{Binding CanStop}" Margin="0,0,0,6" />
+              </WrapPanel>
+              <DataGrid ItemsSource="{Binding Rows}" AutoGenerateColumns="False" IsReadOnly="True"
+                        CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
+                        GridLinesVisibility="Horizontal" MaxHeight="290" MinHeight="120" BorderBrush="#DEE7EB"
+                        AutomationProperties.Name="本次应用统计记录">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="应用 / 进程实例" Binding="{Binding Name}" Width="*" />
+                  <DataGridTextColumn Header="接收" Binding="{Binding Download}" Width="90" />
+                  <DataGridTextColumn Header="发送" Binding="{Binding Upload}" Width="90" />
+                  <DataGridTextColumn Header="身份依据" Binding="{Binding Identity}" Width="145" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <TextBlock Text="{Binding Quality}" TextWrapping="Wrap" Foreground="#607885" FontSize="12"
+                         LineHeight="22" Margin="0,12,0,0" />
+              <TextBlock Text="TCP/UDP · IPv4/IPv6。每个进程实例单独保留，同名软件可能有多行。尚未完成管理员实机精度、高负载及 QUIC 验收；不是互联网出口账单。停止保留记录，再次开始清空；关闭后丢失。"
+                         TextWrapping="Wrap" Foreground="#607885" FontSize="12" LineHeight="22" Margin="0,8,0,0" />
+            </StackPanel>
+          </ScrollViewer>
           <StackPanel x:Name="EmptyState" VerticalAlignment="Center" MaxWidth="500">
             <TextBlock Text="等待首次记录" FontSize="25" FontWeight="SemiBold" />
             <TextBlock x:Name="EmptyDescription" FontSize="15" Foreground="#607885"
@@ -170,7 +195,7 @@
           </StackPanel>
         </Grid>
       </Border>
-      <TextBlock Grid.Row="3" Text="当前记录仅在内存中；历史报表、应用、代理及 SSH 归属仍待开发。"
+      <TextBlock Grid.Row="3" Text="当前记录仅在内存中；应用统计为实验功能，历史报表、代理及 SSH 归属仍待开发。"
                  Margin="0,22,0,0" FontSize="12" Foreground="#607885" TextWrapping="Wrap" />
     </Grid>
   </Grid>

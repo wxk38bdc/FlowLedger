@@ -4,7 +4,7 @@
 
 使用受 .NET 10 支持的 Windows 版本和 x64 SDK。`global.json` 以 10.0.100 为最低 SDK 基线，`latestFeature` 接受后续稳定 .NET 10 特性带；不自动选择预览版。WPF 和 Windows 适配器需要 Windows，纯领域代码独立于平台。
 
-命令行开发只需 SDK；Visual Studio 2026 为可选 IDE。当前不需要 WDK、抓包驱动、服务安装或管理员权限。未来支持范围与权限须通过真实采集验证。
+命令行开发只需 SDK；Visual Studio 2026 为可选 IDE。构建、测试及接口/Wi-Fi 功能无需管理员；明确启用的应用 ETW 原型需要手动提升后的管理员令牌。不需要 WDK、抓包驱动或服务安装。实际 ETW 支持/精度仍待验证。
 
 ## 常用命令
 
@@ -39,6 +39,21 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 `--route-summary` 返回匿名逐接口路由证据，只包含类型及默认/其他前缀条目数；不是路由选择或应用出口判定。无需断网的验证可重复运行 watch-wifi、route-summary 和 verify-counters，但不能以此代替真正网络切换和睡眠恢复。
 
 退出码：0 表示帮助、诊断/采样成功或探测获得结果；1 表示读取失败、无适用数据或参考校验不通过；2 表示参数无效。`--diagnose` 的接口清单不可用输出为 Unavailable，空列表不表示没有网卡。
+
+## 应用 ETW 实验
+
+开发与普通测试不提升权限。需实机验证时，由用户自行打开管理员终端或以管理员身份打开桌面软件，程序不触发 UAC。然后从仓库根目录运行：
+
+```powershell
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --watch-apps 5
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-apps
+```
+
+watch 每秒查询健康计数，1..60 秒后停止自己的唯一命名会话并排空消费者，输出匿名实例/传输类别/未知桶/丢失和守恒；不输出名称/PID。无权限、无事件、已知丢失/拒收、身份失效、容量不足或健康计数不可读返回 1；参数错误返回 2。未识别不等于漏收，守恒不等于精度验收。
+
+verify 仅在权限通过后生成有限本机回环 TCP4/TCP6 各 128 KiB、UDP4/UDP6 各 8 KiB；socket 两端属于同一进程，参考收发各相同。返回四类双向可观察、测试进程归属及质量/守恒结果，失败或不支持 IPv6 视为结论不足。它不验证 size 与 socket 字节相等，不访问公网、不改防火墙或网卡。原始 ETW size 语义及独立同层精度须另验收。
+
+测试通过合成元数据和假 ETW 会话验证，不要求 CI 拥有管理员令牌；普通权限测试在已提升 runner 上明确跳过，避免测试隐式创建内核会话。CI 不执行应用原生采集命令。该依赖用途/许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)；完整边界见 [ADR 0003](decisions/0003-application-etw-validation.md)。
 
 单元测试包括领域计数/会话规则、应用协调器的接口隔离和生命周期、Windows SDK ABI、类型/标志分类、Wi-Fi 失败和原生读取，以及真实桌面视图模型的异步启停/退出时序（使用合成数据源，无需创建窗口）。Windows.Tests 因引用 Desktop 使用 Windows Desktop Runtime。CI 额外执行一秒采样，但不要求托管 runner 存在真实物理硬件，不执行 Wi-Fi 名称查询或网络设置操作。
 

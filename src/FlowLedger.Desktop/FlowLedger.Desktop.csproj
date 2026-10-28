@@ -8,6 +8,8 @@
   <ItemGroup>
     <Resource Include="Assets/FlowLedger.png" />
     <Resource Include="Assets/FlowLedger.ico" />
+    <Content Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../FlowLedger.Application/FlowLedger.Application.csproj" />

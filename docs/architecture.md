@@ -1,16 +1,16 @@
 # 架构设计
 
-状态：已实现接口采集与按需启用的 Wi-Fi 候选分账原型；应用归属、后台服务与持久化仍待验证和开发。
+状态：已实现接口、Wi-Fi 候选分账和明确启用的 ETW 应用统计原型。应用采集需要管理员权限，实机覆盖/精度仍待验证；后台服务与持久化待开发。
 
 ## 当前项目边界
 
 | 项目 | 职责 | 当前实现 |
 |---|---|---|
-| FlowLedger.Domain | 与平台无关的记账规则 | 计数会话、单调速率、Wi-Fi 候选与边界/未知守恒分区 |
-| FlowLedger.Application | 应用契约与会话协调 | 接口及 Wi-Fi 会话协调、通知/路由证据契约 |
-| FlowLedger.Infrastructure.Windows | Windows 平台实现 | GetIfTable2、Native Wi-Fi 查询/通知、只读路由和环境摘要 |
-| FlowLedger.Collector | 采集验证 CLI | 匿名采样、同层参考校验、Wi-Fi 观察及路由摘要 |
-| FlowLedger.Desktop | WPF 界面及组成入口 | 实时总览、可启停 Wi-Fi 账本、出口关系及规划功能空状态 |
+| FlowLedger.Domain | 与平台无关的记账规则 | 接口/Wi-Fi 会话、应用生命周期与未知守恒分区 |
+| FlowLedger.Application | 应用契约与会话协调 | 接口/Wi-Fi 协调、应用快照及异步采集生命周期契约 |
+| FlowLedger.Infrastructure.Windows | Windows 平台实现 | GetIfTable2、Wi-Fi/路由、明确启用的内存 ETW 会话 |
+| FlowLedger.Collector | 采集验证 CLI | 匿名接口/Wi-Fi/应用观察、参考和回环覆盖验证入口 |
+| FlowLedger.Desktop | WPF 界面及组成入口 | 总览、Wi-Fi 账本、独立应用原型与远程连接空状态 |
 | 测试项目 | 领域、协调器与互操作回归 | 差分、断档、隔离、ABI 布局、原生分类及读取 |
 
 引用方向：Application → Domain；Infrastructure.Windows → Application；Desktop/Collector → Application 和 Infrastructure.Windows；各测试项目引用对应生产层。平台实现不能倒流进入 Domain。总览以 Observable ViewModel 保存选择与异步采样状态，导航仍使用少量窗口事件处理。
@@ -26,6 +26,14 @@ Wi-Fi 在手动查询或用户启用分账时读取当前连接，不扫描周�
 WindowsWifiNotificationListener 显式订阅 ACM+MSM；失败时退回 ACM 并将归属降级为未知，完整注册也不证明通知绝无遗漏。回调只复制头部元数据并更新加锁的序列/过渡状态，不调用 WLAN API、不接触界面、不保留通知负载。委托在句柄有效期间保持引用；注销和关闭在锁外完成，避免等候回调时死锁。暂停和退出先等待正在执行的读取，再释放订阅。采样、模式切换与退出通过 SemaphoreSlim 串行化，电源通知使在途结果失效。
 
 WindowsRouteEvidenceReader 调用 GetIpForwardTable2，只向模型返回接口 LUID 和 IPv4/IPv6 默认路由、其他前缀路由数量，不输出网关和目的地址。它用于观察接口/路由关系，不根据默认路由或条目数量推断全部应用出口；路由度量、目的地址最长前缀匹配和 VPN 路径归属仍待验证。
+
+## 应用统计原型
+
+ApplicationTrafficLedger 在纯领域层按 PID、整数 QPC 生命周期和进程键维护实例；四种 TCP/UDP v4/v6 口径单独守恒，缺失归属进入未知。丢失或乱序可能隐含 PID 复用，保守撤回既有进程归属到未知。容量有界，不读正在运行进程列表来猜测旧事件身份。
+
+WindowsApplicationTrafficSource 使用固定版本 Microsoft TraceEvent 和唯一命名会话，八类网络回调只读经典 v2 元数据的 PID/size，不持有事件副本、地址或报文内容。IEtwApplicationSession 隔离真实会话与合成生命周期测试。停止先结束会话再等待消费者排空，释放源后仍可返回内存终态。
+
+ApplicationMonitorViewModel 与接口模块各自串行，计时器只刷新已明确启用的应用源；停止保留快照，重新开始替换会话。电源边界停止且不自动恢复。权限失败显示原因而非零用量。完整策略、权限与未完成的实机验收见 [ADR 0003](decisions/0003-application-etw-validation.md)。
 
 ## 后续数据流
 

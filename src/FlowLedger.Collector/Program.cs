@@ -7,7 +7,7 @@ using FlowLedger.Infrastructure.Windows.Diagnostics;
 if (args.Length == 0 || args is ["--help"] or ["-h"])
 {
     Console.WriteLine("""
-        FlowLedger collector — interface validation build
+        FlowLedger collector — interface and application validation build
 
         Usage:
           FlowLedger.Collector --diagnose   Print read-only environment metadata as JSON
@@ -16,10 +16,13 @@ if (args.Length == 0 || args is ["--help"] or ["-h"])
           FlowLedger.Collector --probe-wifi               Query Wi-Fi capability; print status only (may prompt)
           FlowLedger.Collector --watch-wifi <1..60>       Observe Wi-Fi notifications and usage (may prompt)
           FlowLedger.Collector --route-summary           Print anonymous per-interface route evidence
+          FlowLedger.Collector --watch-apps <1..60>       Observe anonymous per-process ETW usage (administrator)
+          FlowLedger.Collector --verify-apps              Controlled loopback TCP/UDP v4/v6 coverage probe (administrator)
           FlowLedger.Collector --help       Show this help
 
-        Interface samples stay in memory. No service installation or network settings changes.
-        Names, stable IDs, addresses, SSIDs, and payloads are never printed by these commands.
+        Samples stay in memory. No service installation, automatic elevation or network settings changes.
+        Names, process IDs, stable IDs, addresses, SSIDs, and payloads are never printed by these commands.
+        --verify-apps generates bounded local loopback traffic only; no external server is contacted.
         Interface counts include virtual/filter entries and are not physical adapter counts.
         """);
     return 0;
@@ -33,6 +36,17 @@ if (args is ["--probe-wifi"])
 if (args is ["--route-summary"])
 {
     return InterfaceCommands.RouteSummary();
+}
+
+if (args is ["--verify-apps"])
+{
+    return await ApplicationCommands.VerifyAsync();
+}
+
+if (args is ["--watch-apps", var applicationDuration] &&
+    int.TryParse(applicationDuration, out var applicationSeconds) && applicationSeconds is >= 1 and <= 60)
+{
+    return await ApplicationCommands.WatchAsync(applicationSeconds);
 }
 
 if (args is ["--watch-wifi", var wifiDuration] && int.TryParse(wifiDuration, out var wifiSeconds) && wifiSeconds is >= 1 and <= 60)

@@ -4,7 +4,7 @@
 
 - Work inside this checkout. The initial user-requested checkout is `E:\FlowLedger`; use the active checkout path rather than hardcoding it into source or documentation.
 - Respect existing user work. Keep commits grouped around meaningful milestones; do not create a commit for every small edit.
-- The current validation build supports live interface sampling and opt-in in-memory Wi-Fi candidate accounting, with boundary and unknown buckets. Application attribution, persistent history, and services are not implemented. Real switching/roaming/sleep validation remains separate from synthetic tests. Keep README status and UI claims honest.
+- The current validation build supports live interface sampling, opt-in in-memory Wi-Fi candidate accounting, and an explicitly enabled ETW application prototype requiring elevation. Privileged ETW capture/accuracy, real switching/roaming/sleep, and performance acceptance remain unverified; synthetic tests are not hardware acceptance. Persistent history and services are not implemented. Keep README status and UI claims honest.
 
 ## Architecture and accounting
 

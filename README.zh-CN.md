@@ -6,7 +6,7 @@
 
 [English](README.md) · [开发指南](docs/development.md) · [架构设计](docs/architecture.md) · [任务路线](docs/roadmap.md)
 
-**当前处于 Wi-Fi 分账验证阶段。** 已能显示真实接口速率和本次用量，并按需启用 Wi-Fi 网络候选的内存分账；尚未实现应用归属、历史持久化和报表。
+**当前处于应用采集验证阶段。** 已实现实时接口、按需 Wi-Fi 候选分账和明确启用的 ETW 进程用量原型。ETW 需要管理员权限，实际覆盖/精度尚待验收；历史持久化和报表未实现。
 
 ## 已实现与计划功能
 
@@ -20,7 +20,7 @@
 | 只读出口关系检查 | 已实现路由条目摘要；不推断每个应用的互联网出口 |
 | 只读系统、运行时和网络接口分类诊断 | 已实现；不读取接口名称、地址、SSID 或连接目的地 |
 | 首次基线、重置、缺口、时钟变化和缺失测量规则 | 已接入实时接口会话，有自动化测试覆盖 |
-| 每个应用的流量 | 待 ETW 采集能力验证 |
+| 按进程实例的 TCP/UDP、IPv4/IPv6 事件用量 | 已实现实验性 ETW 原型；需要管理员，真实覆盖/精度仍待验收 |
 | Wi-Fi 持久历史及切换/漫游实机验收 | 待完成；当前分账只在内存中 |
 | Clash / Mihomo 去重与原应用归属 | 待版本兼容性和三条路径验证 |
 | Xshell / OpenSSH 的本地流量、服务器专题 | 待连接归属验证 |
@@ -63,11 +63,15 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --route-summary
 ```
 
-当前程序无需管理员权限，不安装服务、不创建数据库，也不修改网络设置。接口诊断的条目数量包含虚拟和过滤层接口，不能当作实际网卡数。未来采集所需权限将单独验证。
+接口、Wi-Fi 和路由功能无需管理员权限；**应用 ETW 采集保守要求提升后的管理员令牌**，普通权限返回 AccessDenied，不创建会话、不自动提权。程序不安装服务、不创建数据库、不修改网络设置。接口数量包含虚拟和过滤层条目，不能当作物理网卡数。
 
-桌面显示本机接口别名，Wi-Fi 信息在手动查询或启用分账期间读取。上述命令行输出不含接口名称、稳定标识、IP/MAC、SSID、配置名称、服务器地址、报文内容或密钥。`--verify-counters` 用 .NET 同层计数在原生样本两端前后夹取参考范围；它不证明应用归属或运营商账单精度，没有可比较硬件接口时视为结论不足。
+桌面显示接口别名，启用应用采集后仅在本地显示进程文件名/PID；Wi-Fi 信息按需读取。CLI 不输出名称、进程号、稳定标识、IP/MAC、SSID、配置、服务器地址、报文内容或密钥。`--verify-counters` 夹取同层参考范围，不证明应用归属或运营商账单精度；无可比较硬件接口视为结论不足。
 
 可选的 `--probe-wifi` 仅输出能力状态；`--watch-wifi 5` 订阅通知并持续查询五秒，输出匿名分区与字节守恒结果。两者可能触发 Windows 位置权限提示，程序不自动授予权限。完整注册 ACM/MSM 表示已订阅对应通知源，不保证每条通知都无遗漏。[候选设计决策](docs/decisions/0002-wifi-candidate-accounting.md)和[验收计划](docs/validation.md)记录了限制。
+
+在**应用统计**页点击“开始应用统计”。若提示权限不足，先关闭软件，再手动以管理员身份打开。每个进程实例单列收发事件 size，未确认身份单列未知；停止保留记录，再次开始清空应用记录，关闭后丢失。电源状态变化后停止，需要手动重新开始。这些数字包含回环/局域网及可能重叠的代理两段，不是互联网账单，也未映射到 WLAN。
+
+可选管理员命令 `--watch-apps 5` 输出匿名进程用量；`--verify-apps` 仅产生有界本机 TCP/UDP v4/v6 回环流量，报告覆盖、PID 归属及 socket 字节参考，不访问外部服务器。本轮仅通过普通权限拒绝及合成回归，尚无真实提升后 ETW 采集结论；覆盖通过也不代表 size 精度、QUIC 或高吞吐验收。详见 [ADR 0003](docs/decisions/0003-application-etw-validation.md)。
 
 ## 开发文档
 
@@ -80,3 +84,5 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 - [架构决策](docs/decisions/0001-foundation.md)：技术选择及重新评估条件。
 
 项目沿用 [Apache License 2.0](LICENSE)。
+
+ETW 解析依赖 Microsoft TraceEvent 4.0.0（MIT），见[第三方声明](THIRD-PARTY-NOTICES.md)。

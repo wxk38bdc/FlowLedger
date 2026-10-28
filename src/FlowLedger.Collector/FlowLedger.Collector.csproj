@@ -4,6 +4,8 @@
     <TargetFramework>net10.0-windows</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../FlowLedger.Application/FlowLedger.Application.csproj" />
     <ProjectReference Include="../FlowLedger.Infrastructure.Windows/FlowLedger.Infrastructure.Windows.csproj" />
   </ItemGroup>
