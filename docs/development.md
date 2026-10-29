@@ -4,7 +4,7 @@
 
 使用受 .NET 10 支持的 Windows 版本和 x64 SDK。`global.json` 以 10.0.100 为最低 SDK 基线，`latestFeature` 接受后续稳定 .NET 10 特性带；不自动选择预览版。WPF 和 Windows 适配器需要 Windows，纯领域代码独立于平台。
 
-命令行开发只需 SDK；Visual Studio 2026 为可选 IDE。构建、测试及接口/Wi-Fi 功能无需管理员；明确启用的应用 ETW 原型需要手动提升后的管理员令牌。不需要 WDK、抓包驱动或服务安装。实际 ETW 支持/精度仍待验证。
+命令行开发只需 SDK；Visual Studio 2026 为可选 IDE。构建、测试及接口/Wi-Fi 功能无需管理员；明确启用的应用 ETW 原型需要手动提升后的管理员令牌。不需要 WDK、抓包驱动或服务安装。受控回环已实测，其他系统/路径的支持与精度仍待验证。
 
 ## 常用命令
 
@@ -47,11 +47,17 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 ```powershell
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --watch-apps 5
 dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-apps
+
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --validate-apps
 ```
 
-watch 每秒查询健康计数，1..60 秒后停止自己的唯一命名会话并排空消费者，输出匿名实例/传输类别/未知桶/丢失和守恒；不输出名称/PID。无权限、无事件、已知丢失/拒收、身份失效、容量不足或健康计数不可读返回 1；参数错误返回 2。未识别不等于漏收，守恒不等于精度验收。
+watch 每秒查询健康计数，1..60 秒后停止自己的唯一命名会话并排空消费者，输出匿名实例/传输类别/未知桶/丢失和守恒；不输出名称/PID。Resources 包含经过秒数、进程 CPU 毫秒、除以逻辑处理器数量后的整机 CPU 百分比，以及定时采样到的工作集/私有内存最大值；不包含内核 ETW 缓冲区，不保证抓到瞬时峰值。无权限、无事件、已知丢失/拒收、身份失效、容量不足或健康计数不可读返回 1；参数错误返回 2。未识别不等于漏收，守恒不等于精度验收。
 
 verify 仅在权限通过后生成有限本机回环 TCP4/TCP6 各 128 KiB、UDP4/UDP6 各 8 KiB；socket 两端属于同一进程，参考收发各相同。返回四类双向可观察、测试进程归属及质量/守恒结果，失败或不支持 IPv6 视为结论不足。它不验证 size 与 socket 字节相等，不访问公网、不改防火墙或网卡。原始 ETW size 语义及独立同层精度须另验收。
+
+validate 在权限通过后运行三轮，每轮 16 个有限子进程。分别覆盖四类传输的不等量收发、24 次短交换和 8 路 TCP 并发（并发部分每轮共 96 MiB 业务收发量）；所有目标地址硬编码为 loopback。另建 `FlowLedger.Reference.<随机 GUID>` 内存会话，直接用 TraceEvent 类型化 size/PID，不复用生产解码器/账本。每个测试进程须完成送达、退出，并观察到唯一 Start/Stop；排空两条会话后逐实例/协议/方向精确比较 socket 参考、类型化参考和生产账本。任何不符/不支持/质量异常退出 1；全部通过退出 0。输出匿名槽位和合成参考量，不输出 PID/端口或背景流量明细。
+
+内部 `--app-probe` 工作者仅由 validate 使用：严格限制传输、端口、单次字节、交换数（最多 32）和每进程业务收发总量（最多 16 MiB），等待父进程信号，20 秒超时；没有 ETW 或外部地址参数。父进程为每个探测设 25 秒边界，异常时只清理自己创建的准确子进程和监听器。命令自身不提权、不创建 ETL、不改防火墙/网络配置，也不安装服务。参考和生产共享内核源，不能作为独立的事件送达真值；资源数据包含双消费者及父进程回环服务，不含子进程 CPU 或内核缓冲区。并发吞吐是包含启动/关闭的短时业务吞吐，不是物理网卡带宽或持续采集承诺。方法及结论见[实测记录](validation/2026-10-29-etw-loopback.md)。
 
 测试通过合成元数据和假 ETW 会话验证，不要求 CI 拥有管理员令牌；普通权限测试在已提升 runner 上明确跳过，避免测试隐式创建内核会话。CI 不执行应用原生采集命令。该依赖用途/许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)；完整边界见 [ADR 0003](decisions/0003-application-etw-validation.md)。
 

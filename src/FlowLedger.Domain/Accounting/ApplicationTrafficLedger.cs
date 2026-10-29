@@ -61,6 +61,13 @@ public sealed class ApplicationTrafficLedger(int maximumLifetimes = 4096)
 
     public void ProcessStarted(int pid, long qpc, string name, ulong key, bool isRundown = false)
     {
+        // Windows rundown includes the idle pseudo-process. It has no application identity;
+        // its presence is not a malformed event or a reason to fail capture health.
+        if (pid == 0)
+        {
+            return;
+        }
+
         if (!AcceptTimestamp(qpc))
         {
             return;

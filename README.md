@@ -6,7 +6,7 @@ A local network usage ledger for Windows, designed for per-app and per-Wi-Fi tra
 
 [中文说明](README.zh-CN.md) · [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-**Status: application collection validation / pre-alpha.** Live interface rates, opt-in Wi-Fi candidate accounting, and an explicitly enabled ETW per-process prototype are available. Privileged ETW coverage/accuracy remains unverified; persistent history and historical reports are not implemented. This is not a production monitoring tool.
+**Status: application collection validation / pre-alpha.** Live interface rates, opt-in Wi-Fi candidate accounting, and an explicitly enabled ETW per-process prototype are available. Three privileged controlled-loopback rounds passed; broader coverage, Internet/proxy accuracy and sustained performance remain unverified. Persistent history and historical reports are not implemented. This is not a production monitoring tool.
 
 ## Why FlowLedger?
 
@@ -26,7 +26,7 @@ Physical interface traffic, application traffic, and proxy traffic are related v
 | Read-only per-interface route evidence | Available; does not infer per-application Internet exits |
 | Read-only OS/runtime and grouped network-interface diagnostics | Available |
 | Startup baselines, resets, gaps, clock changes, and missing measurements | Connected to live interface sessions and covered by automated tests |
-| Per-process TCP/UDP IPv4/IPv6 event usage | Experimental ETW prototype; administrator required, privileged live coverage/accuracy pending |
+| Per-process TCP/UDP IPv4/IPv6 event usage | Elevated ETW prototype; controlled loopback attribution/bytes validated, wider acceptance pending |
 | Persistent Wi-Fi history and certified switching/roaming behavior | Planned; live switching/roaming/sleep acceptance remains pending |
 | Legacy Clash / Mihomo integration and proxy deduplication | Planned; core/version-specific compatibility |
 | SSH client and server usage breakdown | Planned; Xshell and OpenSSH are initial validation targets |
@@ -69,7 +69,7 @@ Optional `--watch-wifi 5` enables notifications and current-connection reads for
 
 On **应用统计**, select **开始应用统计** after manually opening the program as administrator. Each process instance has separate receive/send event-size totals; unknown identities remain separate. Stop retains the snapshot, starting again clears application records, and closing loses all records. Power changes stop application capture and require a manual restart. This view includes loopback/LAN and overlapping proxy legs; it is not an Internet bill or a deduplicated application-to-Wi-Fi mapping.
 
-Optional elevated `--watch-apps 5` prints anonymous ETW process usage; `--verify-apps` generates bounded local TCP/UDP IPv4/IPv6 loopback traffic and reports coverage/PID attribution alongside socket-byte references. It never contacts an external server. Neither command was validated with real privileged ETW capture in the current milestone; ordinary-user denial and synthetic regression tests passed. Coverage success would still not prove size accuracy, QUIC or high-throughput acceptance. See [ADR 0003](docs/decisions/0003-application-etw-validation.md).
+Optional elevated `--watch-apps 5` prints anonymous ETW process usage and process resource samples; `--verify-apps` checks bounded TCP/UDP IPv4/IPv6 loopback coverage. New `--validate-apps` runs three rounds with isolated child processes, unequal receive/send amounts, short connections and eight concurrent TCP workers, comparing production totals with a second session using typed TraceEvent accessors and known socket delivery. It never contacts an external server or captures packet contents. These controlled local checks passed, including the administrator UI start/stop flow; QUIC, Internet/proxy paths, actual PID reuse and sustained performance are still pending. The reference shares the kernel provider and cannot prove independent event completeness. See the [real-machine report](docs/validation/2026-10-29-etw-loopback.md) and [ADR 0003](docs/decisions/0003-application-etw-validation.md).
 
 ## Repository layout
 

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlowLedger.Application.Monitoring;
+using FlowLedger.Collector.Validation;
 using FlowLedger.Domain.Accounting;
 using FlowLedger.Infrastructure.Windows.Monitoring;
 
@@ -18,6 +19,7 @@ internal static class ApplicationCommands
 
     internal static async Task<int> WatchAsync(int seconds)
     {
+        using var resources = new ProcessResourceMeter();
         await using var source = new WindowsApplicationTrafficSource();
         var snapshot = source.Read();
         if (snapshot.State == ApplicationCaptureState.Running)
@@ -26,6 +28,7 @@ internal static class ApplicationCommands
             {
                 await Task.Delay(TimeSpan.FromSeconds(1));
                 snapshot = source.Read();
+                resources.Sample();
                 if (snapshot.State != ApplicationCaptureState.Running)
                 {
                     break;
@@ -36,7 +39,7 @@ internal static class ApplicationCommands
             snapshot = source.Read();
         }
 
-        PrintSummary(snapshot);
+        PrintSummary(snapshot, resources.Complete("Single collector process including startup, collection and drain; excludes kernel ETW buffers. Memory maxima are sampled, not guaranteed peaks."));
         return snapshot.State == ApplicationCaptureState.Stopped && snapshot.Ledger.Observed is not null &&
             snapshot.LossCounterAvailable && snapshot.Ledger.LostEvents == 0 && snapshot.Ledger.RejectedEvents == 0 &&
             !snapshot.Ledger.IdentityUncertain && !snapshot.Ledger.CapacityReached ? 0 : 1;
@@ -110,7 +113,7 @@ internal static class ApplicationCommands
         return coverage ? 0 : 1;
     }
 
-    private static void PrintSummary(ApplicationTrafficSnapshot snapshot) => Console.WriteLine(JsonSerializer.Serialize(new
+    private static void PrintSummary(ApplicationTrafficSnapshot snapshot, ProcessResourceUsage? resources = null) => Console.WriteLine(JsonSerializer.Serialize(new
     {
         snapshot.State,
         snapshot.ErrorCode,
@@ -122,6 +125,7 @@ internal static class ApplicationCommands
         snapshot.Ledger.IdentityUncertain,
         snapshot.Ledger.Observed,
         snapshot.Ledger.Unidentified,
+        Resources = resources,
         PartitionsMatch = PartitionsMatch(snapshot.Ledger),
         Processes = snapshot.Ledger.Processes.Select((row, index) => new { Slot = index + 1, row.IsRundown, row.Traffic }),
     }, JsonOptions));

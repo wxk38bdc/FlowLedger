@@ -9,6 +9,24 @@ public sealed class ApplicationTrafficLedgerTests
     public void NoEventsRemainMissingRatherThanZero() => Assert.IsNull(new ApplicationTrafficLedger().Snapshot().Observed);
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void IdlePseudoProcessDoesNotPoisonHealthOrAcquireTraffic(bool rundown)
+    {
+        var ledger = new ApplicationTrafficLedger();
+        ledger.ProcessStarted(7, 10, "sample.exe", 1);
+        ledger.ProcessStarted(0, 0, "", 0, rundown);
+        ledger.Observe(0, 11, NetworkTransport.Tcp4, true, 123);
+        ledger.Observe(7, 12, NetworkTransport.Tcp4, true, 456);
+        var result = ledger.Snapshot();
+        Assert.AreEqual(0UL, result.RejectedEvents);
+        Assert.IsFalse(result.IdentityUncertain);
+        Assert.AreEqual(123UL, result.Unidentified.Total.ReceivedBytes);
+        Assert.AreEqual(456UL, result.Processes.Single().Traffic.Total.ReceivedBytes);
+        Conserve(result);
+    }
+
+    [TestMethod]
     public void KnownZeroEventIsMeasured()
     {
         var ledger = new ApplicationTrafficLedger();

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlowLedger.Application.Diagnostics;
 using FlowLedger.Collector;
+using FlowLedger.Collector.Validation;
 using FlowLedger.Infrastructure.Windows.Diagnostics;
 
 if (args.Length == 0 || args is ["--help"] or ["-h"])
@@ -18,11 +19,13 @@ if (args.Length == 0 || args is ["--help"] or ["-h"])
           FlowLedger.Collector --route-summary           Print anonymous per-interface route evidence
           FlowLedger.Collector --watch-apps <1..60>       Observe anonymous per-process ETW usage (administrator)
           FlowLedger.Collector --verify-apps              Controlled loopback TCP/UDP v4/v6 coverage probe (administrator)
+          FlowLedger.Collector --validate-apps            Three rounds: child attribution, typed ETW reference, short/concurrent loopback probes
           FlowLedger.Collector --help       Show this help
 
         Samples stay in memory. No service installation, automatic elevation or network settings changes.
         Names, process IDs, stable IDs, addresses, SSIDs, and payloads are never printed by these commands.
-        --verify-apps generates bounded local loopback traffic only; no external server is contacted.
+        --verify-apps / --validate-apps generate bounded local loopback traffic only; no external server is contacted.
+        --validate-apps needs administrator rights and starts finite helper processes; no payloads are captured.
         Interface counts include virtual/filter entries and are not physical adapter counts.
         """);
     return 0;
@@ -41,6 +44,17 @@ if (args is ["--route-summary"])
 if (args is ["--verify-apps"])
 {
     return await ApplicationCommands.VerifyAsync();
+}
+
+if (args is ["--validate-apps"])
+{
+    return await ApplicationValidation.RunAsync();
+}
+
+// Internal validation worker: no ETW, hardcoded loopback, strict byte/count limits and deadline.
+if (ProbeParameters.TryParse(args, out var probe))
+{
+    return await LoopbackProbe.WorkerAsync(probe!);
 }
 
 if (args is ["--watch-apps", var applicationDuration] &&

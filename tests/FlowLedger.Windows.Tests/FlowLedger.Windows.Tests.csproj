@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/FlowLedger.Infrastructure.Windows/FlowLedger.Infrastructure.Windows.csproj" />
     <ProjectReference Include="../../src/FlowLedger.Desktop/FlowLedger.Desktop.csproj" />
+    <ProjectReference Include="../../src/FlowLedger.Collector/FlowLedger.Collector.csproj" />
   </ItemGroup>
 </Project>
