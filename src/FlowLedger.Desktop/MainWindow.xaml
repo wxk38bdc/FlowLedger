@@ -135,7 +135,7 @@
                 <DataGridTextColumn ElementStyle="{StaticResource TableText}" Header="{loc:Text Received}" Binding="{Binding Download}" Width="100" /><DataGridTextColumn ElementStyle="{StaticResource TableText}" Header="{loc:Text Sent}" Binding="{Binding Upload}" Width="100" />
               </DataGrid.Columns></DataGrid>
               <TextBlock Text="{Binding Quality}" Style="{StaticResource Hint}" Margin="0,14,0,0" />
-              <Expander Header="{DynamicResource ServerRules}" Margin="0,16,0,0" IsEnabled="{Binding CanStart}"><StackPanel x:Name="SshRulesPanel" Margin="0,12,0,0">
+              <Expander Header="{DynamicResource ServerRules}" Margin="0,16,0,0" IsEnabled="{Binding CanStart}"><StackPanel x:Name="SshRulesPanel" Margin="0,12,0,0" IsEnabled="{Binding CanChange}">
                 <TextBlock Text="{DynamicResource RulesNote}" Style="{StaticResource Hint}" />
                 <Grid Margin="0,12,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                   <StackPanel Margin="0,0,10,0"><TextBlock Text="{DynamicResource Address}" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{DynamicResource Address}" /></StackPanel>

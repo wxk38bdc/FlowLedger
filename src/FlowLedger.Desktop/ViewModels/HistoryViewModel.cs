@@ -89,8 +89,10 @@ public sealed class HistoryViewModel(IHistoryStore store, string databasePath, T
     public async Task<bool> SetSettingAsync(string key, string value)
     {
         if (!initialized) { return false; }
+        await gate.WaitAsync();
         try { await Task.Run(() => store.SetSetting(key, value)); return true; }
         catch (Exception) { status = L.T("设置保存失败。", "Could not save settings."); Notify(null); return false; }
+        finally { gate.Release(); }
     }
 
     public async Task SaveAsync(IReadOnlyList<HistoryFrame> frames)

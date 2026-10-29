@@ -129,6 +129,24 @@ public sealed class HistoryDesktopTests
         Assert.IsNull(store.Saved[2].Observed); Assert.IsTrue(store.Saved[1].Sequence < store.Saved[2].Sequence);
     }
 
+    [TestMethod]
+    public async Task RepeatedRuleClicksCannotRaceThePendingSettingsWrite()
+    {
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var store = new FakeStore { SettingWrite = () => { entered.TrySetResult(); if (!release.Wait(TimeSpan.FromSeconds(5))) { throw new TimeoutException(); } } };
+        var history = new HistoryViewModel(store, "synthetic"); await history.InitializeAsync();
+        var rules = new SshRulesViewModel(history) { Address = "127.0.0.1", Port = "2222", Alias = "Synthetic" };
+        var first = rules.AddAsync();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(3)); Assert.IsFalse(rules.CanChange);
+            await rules.AddAsync(); await rules.RemoveAsync();
+        }
+        finally { release.Set(); await first; }
+        Assert.HasCount(1, rules.Rules); Assert.HasCount(1, rules.CaptureRules); Assert.IsTrue(rules.CanChange);
+    }
+
     private sealed class FinalSource : IApplicationTrafficSource
     {
         private readonly Guid epoch = Guid.NewGuid();
@@ -150,11 +168,12 @@ public sealed class HistoryDesktopTests
     {
         public bool FailAppend { get; set; }
         public List<HistoryFrame> Saved { get; } = [];
+        public Action? SettingWrite { get; init; }
         public void Initialize() { }
         public void Append(IReadOnlyList<HistoryFrame> frames) { if (FailAppend) { throw new IOException(); } Saved.AddRange(frames); }
         public IReadOnlyList<HistoryStream> GetStreams() => [];
         public HistoryReadout Read(HistoryQuery query) => new([], 0);
         public string? GetSetting(string key) => null;
-        public void SetSetting(string key, string value) { }
+        public void SetSetting(string key, string value) { SettingWrite?.Invoke(); }
     }
 }

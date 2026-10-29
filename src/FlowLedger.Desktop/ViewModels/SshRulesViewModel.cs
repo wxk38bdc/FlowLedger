@@ -8,6 +8,8 @@ namespace FlowLedger.Desktop.ViewModels;
 
 public sealed class SshRulesViewModel(HistoryViewModel history) : ObservableState
 {
+    private bool changing;
+    public bool CanChange => !changing;
     private UiText status = L.T("未添加规则；新建出站连接仍可按客户端候选显示。", "No rules yet. New outbound connections can still appear as client candidates.");
     public ObservableCollection<SshServerRule> Rules { get; } = [];
     public IReadOnlyList<SshServerRule> CaptureRules { get; private set; } = [];
@@ -33,25 +35,37 @@ public sealed class SshRulesViewModel(HistoryViewModel history) : ObservableStat
 
     public async Task AddAsync()
     {
-        var normalized = IPAddress.TryParse(Address.Trim(), out var ip) ? ip.ToString() : "";
-        var rule = new SshServerRule(normalized, int.TryParse(Port, out var port) ? port : 0, Alias.Trim());
-        if (!Valid(rule) || Rules.Count >= 128 || Rules.Any(item => item.Address == rule.Address && item.Port == rule.Port))
-        { status = L.T("请输入唯一的 IPv4 / IPv6 地址、1–65535 端口及不超过 80 字的别名；最多 128 条规则。", "Enter a unique IPv4 / IPv6 address, port 1–65535 and an alias of 1–80 characters. Maximum 128 rules."); Notify(null); return; }
-        var next = Rules.Append(rule).ToArray();
-        if (await history.SetSettingAsync("ssh-rules", JsonSerializer.Serialize(next)))
-        { CaptureRules = next; Rules.Add(rule); Address = ""; Alias = ""; status = L.T("规则已保存，下次开始生效。", "Rule saved. Applies to the next capture."); }
-        else { status = L.T("规则未能保存。", "Rule could not be saved."); }
-        Notify(null);
+        if (changing) { return; }
+        changing = true; Notify(null);
+        try
+        {
+            var normalized = IPAddress.TryParse(Address.Trim(), out var ip) ? ip.ToString() : "";
+            var rule = new SshServerRule(normalized, int.TryParse(Port, out var port) ? port : 0, Alias.Trim());
+            if (!Valid(rule) || Rules.Count >= 128 || Rules.Any(item => item.Address == rule.Address && item.Port == rule.Port))
+            { status = L.T("请输入唯一的 IPv4 / IPv6 地址、1–65535 端口及不超过 80 字的别名；最多 128 条规则。", "Enter a unique IPv4 / IPv6 address, port 1–65535 and an alias of 1–80 characters. Maximum 128 rules."); Notify(null); return; }
+            var next = Rules.Append(rule).ToArray();
+            if (await history.SetSettingAsync("ssh-rules", JsonSerializer.Serialize(next)))
+            { CaptureRules = next; Rules.Add(rule); Address = ""; Alias = ""; status = L.T("规则已保存，下次开始生效。", "Rule saved. Applies to the next capture."); }
+            else { status = L.T("规则未能保存。", "Rule could not be saved."); }
+            Notify(null);
+        }
+        finally { changing = false; Notify(null); }
     }
 
     public async Task RemoveAsync()
     {
+        if (changing) { return; }
         if (SelectedRule is not { } rule) { return; }
-        var next = Rules.Where(item => item != rule).ToArray();
-        if (await history.SetSettingAsync("ssh-rules", JsonSerializer.Serialize(next)))
-        { CaptureRules = next; Rules.Remove(rule); SelectedRule = null; status = L.T("规则已移除，下次开始生效。", "Rule removed. Applies to the next capture."); }
-        else { status = L.T("规则未能移除。", "Rule could not be removed."); }
-        Notify(null);
+        changing = true; Notify(null);
+        try
+        {
+            var next = Rules.Where(item => item != rule).ToArray();
+            if (await history.SetSettingAsync("ssh-rules", JsonSerializer.Serialize(next)))
+            { CaptureRules = next; Rules.Remove(rule); SelectedRule = null; status = L.T("规则已移除，下次开始生效。", "Rule removed. Applies to the next capture."); }
+            else { status = L.T("规则未能移除。", "Rule could not be removed."); }
+            Notify(null);
+        }
+        finally { changing = false; Notify(null); }
     }
 
     private static bool Valid(SshServerRule rule) => IPAddress.TryParse(rule.Address, out var ip) && ip.ToString() == rule.Address

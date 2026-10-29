@@ -150,7 +150,7 @@ public partial class MainWindow : Window
 
     private async void OnStartApplications(object sender, RoutedEventArgs e) => await applications.StartAsync();
     private async void OnStopApplications(object sender, RoutedEventArgs e) { await applications.StopAsync(); await history.SaveAsync([]); }
-    private async void OnStartSsh(object sender, RoutedEventArgs e) => await ssh.StartAsync();
+    private async void OnStartSsh(object sender, RoutedEventArgs e) { if (rules.CanChange) { await ssh.StartAsync(); } }
     private async void OnStopSsh(object sender, RoutedEventArgs e) { await ssh.StopAsync(); await history.SaveAsync([]); }
     private async void OnAddSshRule(object sender, RoutedEventArgs e) { if (ssh.CanStart) { await rules.AddAsync(); } }
     private async void OnRemoveSshRule(object sender, RoutedEventArgs e) { if (ssh.CanStart) { await rules.RemoveAsync(); } }
