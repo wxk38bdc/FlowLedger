@@ -77,7 +77,17 @@ dotnet run --project src/FlowLedger.Collector --configuration Release --no-build
 
 示例端口不是自动检测结果。需要认证时，操作者在运行进程的环境中明确提供 `FLOWLEDGER_CONTROLLER_SECRET`；不要放到命令行参数、版本控制或聊天。程序不读取客户端凭据。桌面可用“查找本机控制器”和密钥框。watch 输出匿名分组，核心总量与连接明细独立；无数据/失败/断档/重置/容量不足返回 1。verify-proxy 传输合成 1 MiB loopback HTTP 响应，要求唯一已确认测试原应用及合理 API 增量，失败返回 1；不是 TUN/公网验收。verify-tcp-owners 仅核对真实本机 v4/v6 socket 归属，不输出四元组。非法参数返回 2。
 
-运行辅助文件位于 LocalApplicationData/FlowLedger：`etw-owner.id` 是本用户随机会话标识；桌面 `proxy-validation.json` 只记录合成验证的匿名质量结果，不含密钥或连接明细。CLI 直接输出匿名结果，不写桌面报告。它们不构成流量数据库；关闭仍丢失用量。丢失/损坏 owner 标识时不强行回收旧会话，也不清理其他用户/工具会话。完整边界见 [ADR 0004](decisions/0004-proxy-accounting.md)。
+运行辅助文件位于 LocalApplicationData/FlowLedger：`etw-owner.id` 是本用户随机会话标识；桌面 `proxy-validation.json` 只记录合成验证的匿名质量结果。CLI 直接输出匿名结果，不写桌面报告。新增 `history.sqlite3` 保存实际观察事实及规则/语言设置，不含密钥/命令行/报文内容。丢失/损坏 owner 标识时不强行回收旧会话，也不清理其他用户/工具会话。
+
+## SSH、本地存储与界面验证
+
+`--verify-history` 无需管理员，创建临时合成 SQLite，提交事实，终止自己创建的未提交事务辅助进程，重开后核对回滚、幂等和完整性；退出 0 才是通过。只清理自己生成且严格匹配临时目录/GUID 命名的文件，不接触实际历史。
+
+`--verify-ssh` 需要管理员和已安装 Windows OpenSSH。只连接本机 v4/v6 随机端口，使用 `-F NUL` 并禁用代理/agent/身份文件/交互认证；比较合成 banner/KEX 的客户端字节、SSH 账本及重开后的 SQLite 报表，不读取用户配置或访问真实远端。失败/无权限/未安装返回 1；程序不自行提升。认证、实际文件传输及跳板/转发须另行验收。源代码中的内部辅助命令只供有界验证使用。
+
+Windows.Tests 增加真实 SQLite 文件测试和被动 WPF 布局测试（不启动真实采集或写用户数据库），两种语言七页检查表头。设置本地进程环境 `FLOWLEDGER_UI_TEST_OUTPUT` 为忽略目录，可将合成界面渲染为 PNG；CI 不设置该值。公开截图不应包含真实使用记录。应用语言和服务器规则存于本机 SQLite settings，不读取其他软件配置。
+
+本次新增依赖为 Microsoft.Data.Sqlite.Core 10.0.10 和 SQLitePCLRaw.bundle_e_sqlite3 3.0.5，实际原生 SQLite 3.53.4；保持 NuGet 漏洞审计，不通过压制 NU1903 继续使用旧原生组件。许可证与解析后依赖见[第三方声明](../THIRD-PARTY-NOTICES.md)。事务、UInt64、归属撤回与时区语义见 [ADR 0005](decisions/0005-local-history-ssh-reports.md)。没有后台服务，自动保留/迁移升级/备份工具另行开发。
 
 ## 本地桌面版本
 

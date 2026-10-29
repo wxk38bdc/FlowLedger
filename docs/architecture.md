@@ -1,16 +1,16 @@
 # 架构设计
 
-状态：接口、Wi-Fi、管理员 ETW 与只读 Clash/Mihomo 代理账本已实现；本机 QUIC、持续 TCP、异常恢复及显式代理已有实测。公网/TUN 和长期验收未完成；后台服务与流量持久化待开发。
+状态：接口、Wi-Fi、管理员 ETW、Clash/Mihomo、SSH 客户端候选、本地 SQLite 和报表已实现；桌面支持中英文。OpenSSH 非标准端口本机 v4/v6 及 SQLite 异常恢复已有实测。真实 TUN 暂缓，其他未测路径/长期验收保留；后台服务未实现。
 
 ## 当前项目边界
 
 | 项目 | 职责 | 当前实现 |
 |---|---|---|
-| FlowLedger.Domain | 与平台无关的记账规则 | 接口/Wi-Fi 会话、应用生命周期与未知守恒分区 |
-| FlowLedger.Application | 应用契约与会话协调 | 接口/Wi-Fi 协调、应用快照及异步采集生命周期契约 |
-| FlowLedger.Infrastructure.Windows | Windows 平台实现 | GetIfTable2、Wi-Fi/路由、明确启用的内存 ETW 会话 |
+| FlowLedger.Domain | 与平台无关的记账规则 | 接口/Wi-Fi、应用生命周期、代理和 SSH 连接守恒分区 |
+| FlowLedger.Application | 应用契约与会话协调 | 采集/历史契约、时区/账期报表规则 |
+| FlowLedger.Infrastructure.Windows | 平台与数据适配 | GetIfTable2、Wi-Fi/路由、明确启用 ETW、代理、SQLite |
 | FlowLedger.Collector | 采集验证 CLI | 匿名接口/Wi-Fi/应用观察、参考和回环覆盖验证入口 |
-| FlowLedger.Desktop | WPF 界面及组成入口 | 总览、Wi-Fi 账本、独立应用原型与远程连接空状态 |
+| FlowLedger.Desktop | WPF 界面及组成入口 | 七页中英文界面、独立采集启停、自动存储与报表/CSV |
 | 测试项目 | 领域、协调器与互操作回归 | 差分、断档、隔离、ABI 布局、原生分类及读取 |
 
 引用方向：Application → Domain；Infrastructure.Windows → Application；Desktop/Collector → Application 和 Infrastructure.Windows；各测试项目引用对应生产层。平台实现不能倒流进入 Domain。总览以 Observable ViewModel 保存选择与异步采样状态，导航仍使用少量窗口事件处理。
@@ -31,7 +31,7 @@ WindowsRouteEvidenceReader 调用 GetIpForwardTable2，只向模型返回接口 
 
 ApplicationTrafficLedger 在纯领域层按 PID、整数 QPC 生命周期和进程键维护实例；四种 TCP/UDP v4/v6 口径单独守恒，缺失归属进入未知。丢失或乱序可能隐含 PID 复用，保守撤回既有进程归属到未知。容量有界，不读正在运行进程列表来猜测旧事件身份。
 
-WindowsApplicationTrafficSource 使用固定版本 Microsoft TraceEvent 和唯一命名会话，八类网络回调只读经典 v2 元数据的 PID/size，不持有事件副本、地址或报文内容。IEtwApplicationSession 隔离真实会话与合成生命周期测试。停止先结束会话再等待消费者排空，释放源后仍可返回内存终态。
+WindowsApplicationTrafficSource 使用固定版本 Microsoft TraceEvent 和唯一命名会话，八类网络回调读取经典 v2 PID/size。普通应用模式不保留地址；明确启用的 SSH 模式另读取 TCP 端点和连接开始/结束元数据，不读报文内容。IEtwApplicationSession 隔离真实会话与合成生命周期测试。停止先结束会话再等待消费者排空，释放源后仍可返回内存终态。连接生命周期事件只用于分行，不叠加其 size。
 
 ApplicationMonitorViewModel 与接口模块各自串行，计时器只刷新已明确启用的应用源；停止保留快照，重新开始替换会话。电源边界停止且不自动恢复。权限失败显示原因而非零用量。完整策略、权限与未完成的实机验收见 [ADR 0003](decisions/0003-application-etw-validation.md)。
 
@@ -53,7 +53,7 @@ ETW 会话新增每用户 owner 标识与 PID/创建时间命名；显式启用�
              查询、报表与桌面展示
 ```
 
-未来采集器独立于界面运行。服务与普通用户界面通过受限本机通信交换摘要；具体账户、权限及命名管道访问控制在采集验证后实现。当前没有服务注册、IPC 或持久化。
+未来采集器独立于界面运行。服务与普通用户界面通过受限本机通信交换摘要；账户、权限和通信访问控制待设计。当前没有服务注册或 IPC，只有窗口内采集的本地持久化。
 
 ## 候选采集策略
 
@@ -65,9 +65,15 @@ ETW 会话新增每用户 owner 标识与 PID/创建时间命名；显式启用�
 
 ETW 关键验收不通过时再评估 WFP 等替代方案，另行明确驱动签名、安装及维护成本。当前不依赖 Npcap、WinPcap 或自研内核驱动。
 
-## 存储与运行可靠性（待开发）
+## 已实现：SSH、存储、报表与界面
 
-SQLite 事务批写，保留来源、层级、时间范围、计数纪元、接口/网络/进程身份和质量事件。批次幂等，异常退出和重启不能重复入账；明细与日汇总使用同一口径。高基数字段和诊断日志限量保存。
+SshUsageLedger 以已知客户端/用户规则为候选证据，按进程生命周期、四元组和连接实例分行，未知/容量/丢失保持守恒。WindowsApplicationTrafficSource 的可选 SSH 领域账本与普通应用统计独立启停；本机验证不使用用户 SSH 配置/身份文件或远端账号。
+
+Application/History 定义 IHistoryStore、累计 HistoryFrame、精确区间事实和 UsageReports。Infrastructure/History 的 SqliteHistoryStore 使用 WAL/FULL、参数化 SQL、事务内事实 + 累计检查点，UInt64 十进制 TEXT，冲突/陈旧帧拒绝，重放幂等，身份撤回同步改列本纪元历史未知。Desktop 的 HistoryViewModel 负责生成独立来源快照、后台保存与可见错误/重试；SQLite 不进入 Domain。
+
+采集继续每秒观察，存储正常五秒合批并保留质量，失败帧不覆盖待写有效测量；停止/查询/退出立即排空。报表以独立 WAL 读取快照查询同一事实，按观察结束 UTC 转换选定时区的日/周/月或自定义范围，不按比例拆分跨期字节。应用按名聚合，Wi-Fi 保留候选身份，来源/层级始终分开。CSV 带来源、区间、时区、整数及质量元数据，对公式开头的名称添加文本前缀。
+
+WPF 七页将常用动作/数字置前、说明折叠。UiText 保留动态状态的双语值，UiCatalog 提供静态资源，TextExtension 显式绑定表格列标题，语言选择在数据库 settings 中保存。单实例桌面减少重复窗口；没有后台采集。具体数据模式、时区语义和限制见 [ADR 0005](decisions/0005-local-history-ssh-reports.md)。
 
 进程身份包含启动时间。记录采集断档、ETW 丢失、API 断联、网络身份缺失和重置。监测失败不能静默成为零用量。速度用单调时钟，展示账期使用选定时区。
 

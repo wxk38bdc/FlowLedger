@@ -2,46 +2,34 @@
 
 <img src="src/FlowLedger.Desktop/Assets/FlowLedger.png" alt="FlowLedger logo" width="112" />
 
-A local network usage ledger for Windows, designed for per-app and per-Wi-Fi tracking, proxy-aware accounting, SSH traffic statistics, and daily, weekly, and monthly reports.
+A local network usage ledger for Windows: interface and application traffic, Wi-Fi candidates, Clash/Mihomo observation, SSH client connections, and daily/weekly/monthly reports.
 
-[中文说明](README.zh-CN.md) · [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
+[中文](README.zh-CN.md) · [Usage](docs/usage.md) · [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-**Status: collection and proxy association validation / pre-alpha.** Interface/Wi-Fi accounting, opt-in elevated ETW and a Clash/Mihomo proxy ledger are available. Controlled QUIC, sustained TCP, owned-session recovery and local explicit-proxy attribution have passed. WAN/TUN accuracy and long-run stability remain unverified. Persistent traffic history and reports are not implemented.
+**v0.2 development preview.** Local SQLite history, reports, CSV export, SSH connection statistics and live Chinese/English switching are implemented. OpenSSH IPv4/IPv6 custom-port loopback accounting and SQLite crash/replay checks have passed. Broader SSH, WAN/TUN, network-switch and long-run acceptance remain pending. Real TUN validation is deferred; there is no background service or installer.
 
-## Why FlowLedger?
+## Capabilities and limits
 
-Answer questions such as “How much did my laptop use on my phone's hotspot?”, “Which application used that traffic?”, and “How much local data did this SSH connection transfer?”
-
-Physical interface traffic, application traffic, and proxy traffic are related views of the same activity. FlowLedger is designed to keep those measurement layers explicit instead of adding them together. See the [accounting rules](docs/accounting.md).
-
-## Current capabilities
-
-| Capability | Status |
+| Capability | Current scope |
 |---|---|
-| Windows desktop shell with Chinese navigation and empty states | Available |
-| Live interface rates and session usage, with independent interface selection | Available; GetIfTable2 counters, 1-second polling |
-| Native hardware/filter/tunnel/loopback classification | Available; hardware candidates are not proof of an Internet exit |
-| On-demand current Wi-Fi name query | Available with permission/error fallback; not historical network attribution |
-| Opt-in Wi-Fi notifications and in-memory candidate usage | Available; boundary-unallocated and unidentified bytes stay separate |
-| Read-only per-interface route evidence | Available; does not infer per-application Internet exits |
-| Read-only OS/runtime and grouped network-interface diagnostics | Available |
-| Startup baselines, resets, gaps, clock changes, and missing measurements | Connected to live interface sessions and covered by automated tests |
-| Per-process TCP/UDP IPv4/IPv6 event usage | Elevated ETW prototype; controlled loopback attribution/bytes validated, wider acceptance pending |
-| Persistent Wi-Fi history and certified switching/roaming behavior | Planned; live switching/roaming/sleep acceptance remains pending |
-| Legacy Clash / Mihomo integration and proxy deduplication | Separate core API ledger and conservative TCP association available; local explicit-proxy tested, full TUN/WAN pending |
-| SSH client and server usage breakdown | Planned; Xshell and OpenSSH are initial validation targets |
-| Local database, daily/weekly/monthly reports, export and quota reminders | Planned |
-| Background Windows service and installer | Planned |
+| Interface rates and usage | Native GetIfTable2, one-second polling, each interface kept separate |
+| Hardware/tunnel/loopback/filter classification | Hardware candidates do not prove an Internet exit |
+| Wi-Fi candidate allocation | Opt-in notifications and current-connection reads; known/boundary/unknown partitions conserve observed bytes |
+| Route evidence | Read-only summaries; no per-application exit inference |
+| Application TCP/UDP v4/v6 | Opt-in administrator ETW; process lifetimes, unknown attribution and loss handling |
+| ETW reliability | Controlled QUIC, three 30-second sustained TCP rounds, owned-session fault/crash recovery validated |
+| Clash/Mihomo ledger | Separate core and partial connection API deltas, conservative TCP owner association; local explicit-proxy validated |
+| SSH client connection ledger | Metadata candidates, process/connection instances, server aliases and exact IP + port rules; OpenSSH v4/v6 custom-port local validation |
+| SQLite history | Transactional facts/checkpoints, idempotent replay, unsigned integer precision, quality and attribution revocation |
+| Reports | Day/week/month/custom range, selectable time zone, partial-data indicators, CSV export |
+| Desktop | Seven pages, simplified explanations, instant Simplified Chinese / English switch saved locally |
+| Still planned | Background service, installer, quotas, name-hiding export, retention/backup tools, broad hardware and 72-hour acceptance |
 
-The desktop displays local interface aliases and, when application collection is enabled, process file names/PIDs. Wi-Fi information is read after an explicit query or while opt-in Wi-Fi accounting is enabled. CLI commands print no names, process IDs, stable IDs, IP/MAC addresses, SSIDs, profiles, destinations, payloads, or secrets. Interface counts include virtual and filter entries. No database or background service is created. Closing stops collectors, releases owned subscriptions/sessions, and discards totals.
-
-The overview shows one interface at a time and never sums overlapping physical, tunnel, proxy, or filter layers. A first sample establishes a baseline without counting traffic from before startup. Failed reads, offline/removed adapters, observed identity changes, counter decreases, power notifications, clock jumps, and polling gaps over five seconds break continuity. Rates are unavailable during gaps; valid session totals remain partial. See [validation and remaining limits](docs/validation.md).
-
-On the **网络账本** page, enable Wi-Fi accounting to observe connection/roaming notifications and bracket interface counter reads with connection queries. Candidates use raw SSID bytes, profile, security, and Windows network context; BSSID changes alone do not create a new candidate. These fields cannot prove globally unique network identity. Stable observed intervals are assigned to a candidate; transition intervals remain boundary-unallocated, and missing identity or incomplete notification registration produces unidentified usage. All three partitions sum exactly to the valid bytes observed while accounting is enabled. Pause/resume establishes a fresh attribution baseline. Physical counter continuity uses adapter identity rather than network identity, so valid switching bytes can remain visible in the boundary bucket.
+Interface, application, proxy and SSH views overlap. **Never add these layers into a machine-wide total.** SSH is an application subset; forwarding can add candidate TCP legs. Interface traffic includes LAN and loopback/virtual interfaces remain distinct. Missing data is not zero. See [accounting rules](docs/accounting.md) and the [support matrix](docs/support-matrix.md).
 
 ## Build and run
 
-Use a supported Windows x64 environment and a stable **.NET 10 SDK**. `global.json` accepts stable .NET 10 feature bands. Visual Studio is optional; Visual Studio 2026 can open `FlowLedger.slnx`.
+Use Windows x64 and a stable **.NET 10 SDK**. Visual Studio is optional. The published desktop needs the .NET 10 Windows Desktop Runtime.
 
 ```powershell
 git clone https://github.com/wxk38bdc/FlowLedger.git
@@ -52,55 +40,41 @@ dotnet test --solution FlowLedger.slnx --configuration Release --no-build
 dotnet run --project src/FlowLedger.Desktop --configuration Release --no-build
 ```
 
-For read-only command-line diagnostics:
+Interface collection starts with the window. Enable Wi-Fi allocation and proxy observation separately. **Application and SSH capture require reopening the program as administrator**, then explicitly starting capture. The product never elevates itself, installs a driver/service or changes network/proxy settings. Power boundaries stop application/proxy/SSH capture and require manual restart.
 
-```powershell
-dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --diagnose
-dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --sample 5
-dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-counters 5
-dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --route-summary
-```
+For SSH, start **SSH connections** capture before opening an OpenSSH connection in Windows Terminal. New outbound connections and port 22 can appear as client candidates. For existing custom-port connections or aliases, add the actual server IP, port and alias under **Server aliases & rules** while stopped, then start again. Hostnames are not resolved. Names indicate candidates and rules indicate user confirmation; neither is protocol inspection. Jumps/proxies show locally visible endpoints only. Multiplexed channels and remote-only downloads cannot be assigned to final servers. Other recognized client names include scp/sftp, Xshell and PuTTY/Plink; this milestone's real-client validation prioritizes OpenSSH.
 
-Interface/Wi-Fi/route features run without administrator privileges. **Application ETW collection conservatively requires an elevated administrator token** and returns AccessDenied without creating a session otherwise. The program never elevates itself. See [development instructions](docs/development.md) for commands, exit codes, and limitations.
+For Clash/Mihomo, enter the HTTP/mixed entry port, use **Find local controller**, enter the token locally, and start observation. Controller and entry ports differ. Tokens remain in memory. Only loopback `/version` and `/connections` GET requests are made; no client configs or rules are read/changed. Active lists can miss short connections and closing tails; core and connection totals are separate. Local validation transfers a synthetic 1 MiB loopback response and does not test TUN/WAN.
 
-`--verify-counters` brackets native endpoint samples with .NET counter reads at the same OS layer; it does not validate application attribution or ISP billing. No comparable hardware interface is an inconclusive result. The optional `--probe-wifi` command prints capability status only and may trigger a Windows location prompt. No permission is granted automatically.
+## Local history and reports
 
-Optional `--watch-wifi 5` enables notifications and current-connection reads for five seconds, then prints anonymous partitions and a byte-conservation result. It may trigger a Windows location prompt and never grants consent automatically. Full ACM/MSM registration indicates subscribed sources, not guaranteed delivery of every notification. See [the design decision and remaining ambiguity](docs/decisions/0002-wifi-candidate-accounting.md).
-
-On **应用统计**, select **开始应用统计** after manually opening the program as administrator. Each process instance has separate receive/send event-size totals; unknown identities remain separate. Stop retains the snapshot, starting again clears application records, and closing loses all records. Power changes stop application capture and require a manual restart. This view includes loopback/LAN and overlapping proxy legs; it is not an Internet bill or a deduplicated application-to-Wi-Fi mapping.
-
-Optional elevated `--watch-apps 5` prints anonymous ETW process usage and process resource samples; `--verify-apps` checks bounded TCP/UDP IPv4/IPv6 loopback coverage. New `--validate-apps` runs three rounds with isolated child processes, unequal receive/send amounts, short connections and eight concurrent TCP workers, comparing production totals with a second session using typed TraceEvent accessors and known socket delivery. It never contacts an external server or captures packet contents. These controlled local checks passed, including the administrator UI start/stop flow; WAN/TUN accuracy, actual PID reuse, forced native loss and long-run stability are still pending. The reference shares the kernel provider and cannot prove independent event completeness. See the [real-machine report](docs/validation/2026-10-29-etw-loopback.md) and [ADR 0003](docs/decisions/0003-application-etw-validation.md).
-
-Later reliability checks added local QUIC v4/v6, three 30-second sustained TCP rounds and recovery after interrupted sessions/crashed helpers. Elevated `--verify-reliability 30` and `--verify-etw-recovery` reproduce these checks. Recovery only matches this user's new-format FlowLedger sessions with demonstrably dead/reused owner processes; active, unconfirmed, foreign and legacy names are untouched. See the [current report](docs/validation/2026-10-29-reliability-proxy.md).
-
-On **代理账本**, enter the HTTP/mixed inbound port (commonly 7890), choose **查找本机控制器**, enter the controller token locally and enable observation. Controller ports differ from inbound ports and can change after core restarts. Tokens stay in memory; no client configs, rules, system-proxy or TUN settings are read/changed. Only `/version` and `/connections` are requested. Stop retains records, restarting clears them, and closing loses usage records.
-
-The core's logical total and partial consecutive-connection deltas remain separate. Each connection is counted once; ETW app/core, loopback, proxy-chain hops and physical bytes are never added. TCP ownership requires matching socket/process-instance evidence on both sides of an API read. UDP, short-lived or mismatched TUN tuples remain unknown. Active snapshots miss initial/tail bytes and complete short connections. **验证本机代理** generates a synthetic 1 MiB loopback response to verify explicit-proxy attribution; it does not validate TUN/WAN. See the [proxy decision](docs/decisions/0004-proxy-accounting.md) and [support matrix](docs/support-matrix.md).
-
-Runtime helper files contain only the per-user random ETW ownership marker and a token-free synthetic proxy-validation summary, not real connection details or usage history. No background service, SQLite history or period reports are implemented.
-
-## Repository layout
+The desktop normally batches observed data every five seconds, flushing on stop, query and exit, to:
 
 ```text
-src/
-  FlowLedger.Domain/                  Accounting rules; no platform dependencies
-  FlowLedger.Application/             Contracts, diagnostic models, interface session coordinator
-  FlowLedger.Infrastructure.Windows/  Native counters, WLAN/routes and opt-in ETW sessions
-  FlowLedger.Collector/               Anonymous observations, reference/loopback validation
-  FlowLedger.Desktop/                 Interface/Wi-Fi monitor and experimental application page
-tests/
-  FlowLedger.Domain.Tests/            Counter and session accounting regression tests
-  FlowLedger.Application.Tests/       Per-interface isolation and lifecycle tests
-  FlowLedger.Windows.Tests/           ABI, classification, Wi-Fi fallback and native read tests
-docs/                                Product, architecture, validation and decisions
+%LOCALAPPDATA%\FlowLedger\history.sqlite3
 ```
 
-## Contributing
+Saved history survives stop, restart and new captures. **Reports** selects one independent ledger, grouping period, inclusive date range and time zone. Weeks start Monday. Intervals are booked at observation end, without proportional splitting across period boundaries. Empty periods mean no observations. CSV exports the selected report, including integer bytes, scope, time zone and quality metadata.
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [validation plan](docs/validation.md). Contributions should keep planned features clearly distinguished from verified capabilities. Never include real packet captures, private network histories, proxy subscriptions, or credentials in changes or issue reports.
+Capture stops when the window closes; unobserved and uncommitted traffic cannot be recovered. Storage failures are shown and retried, with an explicit warning if closing would discard pending data. The unencrypted database may contain local interface/network names, process names and SSH server addresses/aliases. It stays local and contains no passwords, proxy tokens, SSH keys, command lines or packet payloads. CSV currently contains real names. Keep runtime databases and exports private. Retention/backup management and encrypted storage are not implemented. See [usage](docs/usage.md) and [the storage/SSH decision](docs/decisions/0005-local-history-ssh-reports.md).
+
+## Validation
+
+```powershell
+dotnet format FlowLedger.slnx --verify-no-changes --no-restore
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --help
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --diagnose
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-history
+# Explicit administrator validation, local synthetic traffic only:
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-ssh
+```
+
+Ordinary CLI observations are memory-only and anonymous. History validation uses a disposable synthetic database and terminates only its own transaction helper. SSH validation uses the installed OpenSSH client against synthetic loopback banner/KEX endpoints, with user configuration, identity/agent and interactive authentication disabled. It does not test authenticated remote transfers. See [current validation](docs/validation/2026-10-29-ssh-history.md), [ETW evidence](docs/validation/2026-10-29-etw-loopback.md), [reliability/proxy evidence](docs/validation/2026-10-29-reliability-proxy.md), and [remaining acceptance](docs/validation.md).
+
+## Repository
+
+Domain contains platform-free accounting. Application defines monitoring/history contracts and report rules. Windows infrastructure provides native counters/WLAN/ETW/proxy adapters and SQLite. Desktop and Collector compose those pieces. Tests cover accounting, lifecycles, storage, reports and Windows UI/interop. See [architecture](docs/architecture.md) and [contribution instructions](CONTRIBUTING.md).
 
 ## License
 
-[Apache License 2.0](LICENSE).
-
-ETW parsing uses Microsoft's MIT-licensed TraceEvent 4.0.0; see [third-party notices](THIRD-PARTY-NOTICES.md).
+[Apache License 2.0](LICENSE). TraceEvent, Microsoft.Data.Sqlite, SQLitePCLRaw and SQLite retain their own licenses; see [third-party notices](THIRD-PARTY-NOTICES.md). No Mihomo runtime or test database is distributed.

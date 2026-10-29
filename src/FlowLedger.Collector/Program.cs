@@ -26,9 +26,12 @@ if (args.Length == 0 || args is ["--help"] or ["-h"])
           FlowLedger.Collector --watch-proxy <1..60> <controller-url> <proxy-port>  Anonymous read-only core usage
           FlowLedger.Collector --verify-proxy <controller-url> <proxy-port>       Local explicit-proxy attribution probe
           FlowLedger.Collector --verify-tcp-owners        Verify native IPv4/IPv6 socket ownership using controlled loopback
+          FlowLedger.Collector --verify-ssh               Local OpenSSH IPv4/IPv6 custom-port capture and SQLite replay (administrator)
+          FlowLedger.Collector --verify-history           SQLite committed replay and owned-helper crash rollback
           FlowLedger.Collector --help       Show this help
 
-        Samples stay in memory. No service installation, automatic elevation or network settings changes.
+        Ordinary samples stay in memory. History/SSH validation uses disposable synthetic SQLite data only.
+        No service installation, automatic elevation or network settings changes.
         Names, process IDs, stable IDs, addresses, SSIDs, and payloads are never printed by these commands.
         --verify-apps / --validate-apps generate bounded local loopback traffic only; no external server is contacted.
         --validate-apps needs administrator rights and starts finite helper processes; no payloads are captured.
@@ -53,6 +56,10 @@ if (args is ["--verify-apps"])
 {
     return await ApplicationCommands.VerifyAsync();
 }
+
+if (args is ["--verify-history"]) { return await RunSafeAsync(HistoryValidation.RunAsync); }
+if (args is ["--verify-ssh"]) { return await RunSafeAsync(SshValidation.RunAsync); }
+if (args is ["--history-transaction-worker", var historyPath]) { return await RunSafeAsync(() => HistoryValidation.TransactionWorkerAsync(historyPath)); }
 
 if (args is ["--validate-apps"])
 {

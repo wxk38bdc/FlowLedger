@@ -5,6 +5,9 @@
   <Application.Resources>
     <Style TargetType="TextBlock">
       <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="23" />
     </Style>
     <Style TargetType="Button">
       <Setter Property="Padding" Value="18,10" />
@@ -13,6 +16,35 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.87" /></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.45" /></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderThickness" Value="2" /><Setter TargetName="Chrome" Property="BorderBrush" Value="#70CBB6" /></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="Hint" TargetType="TextBlock"><Setter Property="FontSize" Value="13" /><Setter Property="Foreground" Value="#526C79" /><Setter Property="LineHeight" Value="22" /></Style>
+    <Style x:Key="FieldLabel" TargetType="TextBlock"><Setter Property="FontSize" Value="13" /><Setter Property="Foreground" Value="#526C79" /><Setter Property="Margin" Value="0,12,0,6" /></Style>
+    <Style x:Key="Status" TargetType="TextBlock"><Setter Property="Foreground" Value="#235B4F" /><Setter Property="FontSize" Value="14" /></Style>
+    <Style x:Key="MetricValue" TargetType="TextBlock"><Setter Property="FontSize" Value="28" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Margin" Value="0,12,0,0" /><Setter Property="LineHeight" Value="36" /></Style>
+    <Style x:Key="MetricCard" TargetType="Border"><Setter Property="Background" Value="#F0F7F5" /><Setter Property="CornerRadius" Value="9" /><Setter Property="Padding" Value="20" /><Setter Property="Margin" Value="0,0,12,12" /></Style>
+    <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7" /><Setter Property="FontSize" Value="14" /><Setter Property="BorderBrush" Value="#C6D5DD" /><Setter Property="MinHeight" Value="36" /></Style>
+    <Style TargetType="PasswordBox"><Setter Property="Padding" Value="9,7" /><Setter Property="FontSize" Value="14" /><Setter Property="BorderBrush" Value="#C6D5DD" /><Setter Property="MinHeight" Value="36" /></Style>
+    <Style TargetType="ComboBox"><Setter Property="Padding" Value="8,7" /><Setter Property="FontSize" Value="14" /><Setter Property="MinHeight" Value="36" /><Setter Property="MaxDropDownHeight" Value="340" /></Style>
+    <Style TargetType="DatePicker"><Setter Property="FontSize" Value="14" /><Setter Property="MinHeight" Value="36" /></Style>
+    <Style x:Key="TableText" TargetType="TextBlock"><Setter Property="TextWrapping" Value="NoWrap" /><Setter Property="TextTrimming" Value="CharacterEllipsis" /><Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" /></Style>
+    <Style TargetType="Expander"><Setter Property="FontSize" Value="14" /><Setter Property="Foreground" Value="#526C79" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
+    <Style TargetType="DataGrid">
+      <Setter Property="AutoGenerateColumns" Value="False" /><Setter Property="IsReadOnly" Value="True" /><Setter Property="CanUserAddRows" Value="False" /><Setter Property="CanUserDeleteRows" Value="False" />
+      <Setter Property="HeadersVisibility" Value="Column" /><Setter Property="GridLinesVisibility" Value="None" /><Setter Property="BorderBrush" Value="#DCE5E9" /><Setter Property="BorderThickness" Value="1" />
+      <Setter Property="RowHeight" Value="40" /><Setter Property="ColumnHeaderHeight" Value="40" /><Setter Property="FontSize" Value="13" /><Setter Property="AlternatingRowBackground" Value="#F5F8FA" />
+      <Setter Property="MinHeight" Value="210" /><Setter Property="MaxHeight" Value="380" /><Setter Property="EnableRowVirtualization" Value="True" /><Setter Property="EnableColumnVirtualization" Value="True" />
+    </Style>
+    <Style TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="12,8" /><Setter Property="Background" Value="#EDF3F6" /><Setter Property="Foreground" Value="#365563" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style TargetType="DataGridCell"><Setter Property="Padding" Value="10,7" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridCell"><Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"><ContentPresenter VerticalAlignment="Center" /></Border></ControlTemplate></Setter.Value></Setter></Style>
   </Application.Resources>
 </Application>

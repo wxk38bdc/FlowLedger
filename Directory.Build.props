@@ -7,7 +7,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <IsPackable>false</IsPackable>
-    <Version>0.1.0-alpha</Version>
+    <Version>0.2.0-alpha</Version>
     <Product>FlowLedger</Product>
     <RepositoryUrl>https://github.com/wxk38bdc/FlowLedger</RepositoryUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

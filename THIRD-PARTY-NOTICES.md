@@ -37,3 +37,17 @@ SOFTWARE.
 The .NET 10 Windows dependency graph also resolves Microsoft.Diagnostics.NETCore.Client 0.2.661903, Microsoft.Extensions.DependencyInjection.Abstractions 8.0.2, Microsoft.Extensions.Logging.Abstractions 8.0.3 and System.Reflection.TypeExtensions 4.7.0. These Microsoft packages use MIT licenses; their upstream copyright notices remain applicable. The SDK may satisfy additional package references with framework assemblies. Inspect the actual graph with `dotnet list src/FlowLedger.Infrastructure.Windows package --include-transitive` after changing SDK or dependencies; do not treat this list as a frozen lock file.
 
 The .NET runtime and Microsoft test SDK/packages are separately distributed development/runtime prerequisites. Their notices are included in their original distributions.
+
+## Microsoft.Data.Sqlite.Core 10.0.10
+
+Purpose: local-only SQLite history transactions and queries. Package license: MIT. Package copyright: © Microsoft Corporation. All rights reserved. The MIT permission and warranty/disclaimer text reproduced above also applies to this package. Project: [dotnet/efcore](https://github.com/dotnet/efcore), [license](https://github.com/dotnet/efcore/blob/main/LICENSE.txt). The package does not itself contain native SQLite.
+
+## SQLitePCLRaw 3.0.5
+
+Direct package: SQLitePCLRaw.bundle_e_sqlite3 3.0.5; resolved configuration/core/provider packages: SQLitePCLRaw.config.e_sqlite3, SQLitePCLRaw.core, SQLitePCLRaw.provider.e_sqlite3 3.0.5. Purpose: initialize the SQLite native interop provider. Copyright 2014-2026 SourceGear, LLC. License: Apache-2.0, reproduced in this repository's [LICENSE](LICENSE); upstream [SQLitePCL.raw](https://github.com/ericsink/SQLitePCL.raw). Dependencies remain separately licensed; FlowLedger's project license is unchanged.
+
+## SQLite 3.53.4 native builds
+
+The bundle resolves NuGet package SQLite 3.53.4, author Eric Sink; package metadata copyright 2014-2026 SourceGear, LLC. Its LICENSE.txt states: “SQLite is Public Domain” and points to [sqlite.org/copyright.html](https://sqlite.org/copyright.html). These builds provide e_sqlite3 for supported runtime platforms. No encryption extension is included. No SQLite source is vendored. Native binaries are included only through the published application's package dependencies.
+
+Do not substitute the vulnerable legacy SQLitePCLRaw.lib.e_sqlite3 2.1.11 bundle or suppress its NuGet security warning. Re-audit the resolved dependency graph when updating; the versions above describe this milestone, not a forever-frozen graph. No Mihomo runtime, SSH server, user database or validation data is bundled.

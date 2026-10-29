@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using FlowLedger.Application.Monitoring;
 using FlowLedger.Domain.Accounting;
+using FlowLedger.Domain.Ssh;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
@@ -15,6 +16,8 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
     private readonly object lifecycleGate = new();
     private readonly object ledgerGate = new();
     private readonly ApplicationTrafficLedger ledger = new();
+    private readonly SshUsageLedger? ssh;
+    private long sshIdentityRevision;
     private readonly Guid epoch = Guid.NewGuid();
     private readonly IEtwApplicationSession? session;
     private readonly Task? consumer;
@@ -28,8 +31,11 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
 
     public WindowsApplicationTrafficSource() : this(Guid.NewGuid()) { }
 
-    internal WindowsApplicationTrafficSource(Guid captureEpoch)
+    public WindowsApplicationTrafficSource(IReadOnlyList<SshServerRule> rules) : this(Guid.NewGuid(), new SshUsageLedger(rules)) { }
+
+    internal WindowsApplicationTrafficSource(Guid captureEpoch, SshUsageLedger? ssh = null)
     {
+        this.ssh = ssh;
         epoch = captureEpoch;
         if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
         {
@@ -53,7 +59,18 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
             var parser = new KernelTraceEventParser(source, KernelTraceEventParser.ParserTrackingOptions.None);
             parser.ProcessStart += data => OnProcessStart(data, false);
             parser.ProcessDCStart += data => OnProcessStart(data, true);
-            parser.ProcessStop += data => WithLedger(() => ledger.ProcessStopped(data.ProcessID, Qpc(data), data.UniqueProcessKey));
+            parser.ProcessStop += data => WithLedger(() =>
+            {
+                ledger.ProcessStopped(data.ProcessID, Qpc(data), data.UniqueProcessKey);
+                ssh?.Close(data.ProcessID);
+            });
+            if (ssh is not null)
+            {
+                parser.TcpIpDisconnect += data => OnConnectionBoundary(data, false, false);
+                parser.TcpIpDisconnectIPV6 += data => OnConnectionBoundary(data, true, false);
+                parser.TcpIpConnect += data => OnConnectionBoundary(data, false, true);
+                parser.TcpIpConnectIPV6 += data => OnConnectionBoundary(data, true, true);
+            }
             parser.TcpIpSend += data => OnNetwork(data, NetworkTransport.Tcp4, false);
             parser.TcpIpRecv += data => OnNetwork(data, NetworkTransport.Tcp4, true);
             parser.TcpIpSendIPV6 += data => OnNetwork(data, NetworkTransport.Tcp6, false);
@@ -118,7 +135,8 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
 
             lock (ledgerGate)
             {
-                return new(epoch, state, ledger.Snapshot(), lossCounterAvailable, errorCode, recovery);
+                SyncSshIdentity();
+                return new(epoch, state, ledger.Snapshot(), lossCounterAvailable, errorCode, recovery, ssh?.Snapshot());
             }
         }
     }
@@ -220,6 +238,7 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
     {
         // Never request command lines, SIDs, full user paths, destinations or packet payloads.
         var name = data.KernelImageFileName.Replace('/', '\\').Split('\\').Last();
+        if (!rundown) { ssh?.Close(data.ProcessID); }
         ledger.ProcessStarted(data.ProcessID, Qpc(data), name, data.UniqueProcessKey, rundown);
     });
 
@@ -233,6 +252,25 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
 
         // No retransmit/copy/connect handlers: only one send/receive family for each transport.
         ledger.Observe(pid, Qpc(data), transport, received, size);
+        if (ssh is not null && transport is NetworkTransport.Tcp4 or NetworkTransport.Tcp6)
+        {
+            if (EtwNetworkDecoder.TryReadFlow(data.Version, data.DataStart, data.EventDataLength,
+                transport == NetworkTransport.Tcp6, out var flow))
+            {
+                ssh.Observe(ledger.ResolveProcess(pid, Qpc(data)), Qpc(data), flow!, received, size);
+            }
+            else { ssh.InvalidateIdentities(); }
+        }
+    });
+
+    private void OnConnectionBoundary(TraceEvent data, bool ipv6, bool connected) => WithLedger(() =>
+    {
+        if (EtwNetworkDecoder.TryRead(data.Version, data.DataStart, data.EventDataLength, out var pid, out _) &&
+            EtwNetworkDecoder.TryReadFlow(data.Version, data.DataStart, data.EventDataLength, ipv6, out var flow))
+        {
+            if (connected) { ssh?.Connected(ledger.ResolveProcess(pid, Qpc(data)), flow!); }
+            else { ssh?.Close(pid, flow); }
+        }
     });
 
     private void WithLedger(Action action)
@@ -242,12 +280,23 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
             try
             {
                 action();
+                SyncSshIdentity();
             }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
             {
                 ledger.RejectEvent();
                 ledger.InvalidateIdentities();
+                SyncSshIdentity();
             }
+        }
+    }
+
+    private void SyncSshIdentity()
+    {
+        if (sshIdentityRevision != ledger.IdentityRevision)
+        {
+            ssh?.InvalidateIdentities();
+            sshIdentityRevision = ledger.IdentityRevision;
         }
     }
 

@@ -58,6 +58,7 @@ public sealed class ApplicationTrafficLedger(int maximumLifetimes = 4096)
     private bool capacityReached;
     private bool identityUncertain;
     private long latestQpc = -1;
+    public long IdentityRevision { get; private set; }
 
     public void ProcessStarted(int pid, long qpc, string name, ulong key, bool isRundown = false)
     {
@@ -151,6 +152,7 @@ public sealed class ApplicationTrafficLedger(int maximumLifetimes = 4096)
 
     public void InvalidateIdentities()
     {
+        IdentityRevision++;
         // Loss/late lifecycle evidence has no precise boundary. Revoke existing attribution rather
         // than leave possibly misnamed bytes after a hidden PID reuse. Observed bytes are conserved.
         foreach (var lifetime in retained)
@@ -167,6 +169,12 @@ public sealed class ApplicationTrafficLedger(int maximumLifetimes = 4096)
         retained.Where(item => item.HasTraffic)
             .Select(item => new ProcessTraffic(item.Pid, item.Start, item.Name, item.Rundown, item.Traffic)).ToArray(),
         unidentified, observed, networkEvents, rejectedEvents, lostEvents, capacityReached, identityUncertain);
+
+    public ProcessTraffic? ResolveProcess(int pid, long qpc)
+    {
+        var lifetime = Find(pid, qpc);
+        return lifetime is null ? null : new(lifetime.Pid, lifetime.Start, lifetime.Name, lifetime.Rundown, lifetime.Traffic);
+    }
 
     private Lifetime? Find(int pid, long qpc) => lifetimes.TryGetValue(pid, out var history)
         ? history.LastOrDefault(item => item.Start <= qpc && qpc < item.End)
