@@ -5,6 +5,7 @@ using FlowLedger.Application.Diagnostics;
 using FlowLedger.Desktop.ViewModels;
 using FlowLedger.Infrastructure.Windows.Diagnostics;
 using FlowLedger.Infrastructure.Windows.Monitoring;
+using FlowLedger.Infrastructure.Windows.Proxy;
 using Microsoft.Win32;
 
 namespace FlowLedger.Desktop;
@@ -14,6 +15,7 @@ public partial class MainWindow : Window
     private readonly IHostDiagnosticsReader diagnosticsReader = new WindowsHostDiagnosticsReader();
     private readonly InterfaceMonitorViewModel monitor;
     private readonly ApplicationMonitorViewModel applications = new(() => new WindowsApplicationTrafficSource());
+    private readonly ProxyMonitorViewModel proxy = new((endpoint, secret, port) => new ClashProxySource(endpoint, secret, port));
     private readonly DispatcherTimer sampleTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool closed;
 
@@ -22,7 +24,8 @@ public partial class MainWindow : Window
         ("总览", "实时查看所选接口的流量；各接口独立计量。", ""),
         ("网络账本", "按 Wi-Fi 网络候选分账；切换边界和未知归属分别保留。", ""),
         ("应用统计", "按进程实例查看应用网络事件用量；实验阶段，需管理员权限。", ""),
-        ("远程连接", "查看 SSH 与代理连接的本地流量消耗。", "这里将按服务器和连接汇总本机用量。远程服务器自身的下载不会被视作本地下载。"),
+        ("代理账本", "只读关联 Clash / Mihomo 活动连接，按核心逻辑字节单独记账。", ""),
+        ("远程连接", "查看 SSH 连接的本地流量消耗。", "这里将按服务器和连接汇总本机用量。远程服务器自身的下载不会被视作本地下载。"),
         ("运行环境", "查看这台电脑的基础运行条件。", ""),
     ];
 
@@ -34,6 +37,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = monitor;
         ApplicationPanel.DataContext = applications;
+        ProxyPanel.DataContext = proxy;
         NavigationList.SelectedIndex = 0;
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -56,8 +60,9 @@ public partial class MainWindow : Window
         TrafficPanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
         WifiLedgerPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
         ApplicationPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyState.Visibility = index is 0 or 1 or 2 or 4 ? Visibility.Collapsed : Visibility.Visible;
-        EnvironmentPanel.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+        ProxyPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+        EnvironmentPanel.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnCheckEnvironment(object sender, RoutedEventArgs e)
@@ -80,7 +85,34 @@ public partial class MainWindow : Window
     }
 
     private async void OnSample(object? sender, EventArgs e) =>
-        await Task.WhenAll(monitor.RefreshAsync(), applications.RefreshAsync());
+        await Task.WhenAll(monitor.RefreshAsync(), applications.RefreshAsync(), proxy.RefreshAsync());
+
+    private async void OnStartProxy(object sender, RoutedEventArgs e)
+    {
+        var secret = ProxySecret.Password;
+        ProxySecret.Clear();
+        await proxy.StartAsync(secret);
+    }
+
+    private async void OnStopProxy(object sender, RoutedEventArgs e) => await proxy.StopAsync();
+
+    private async void OnFindProxy(object sender, RoutedEventArgs e) => await proxy.DiscoverAsync(port => ProxyControllerDiscovery.FindAsync(port));
+
+    private async void OnVerifyProxy(object sender, RoutedEventArgs e)
+    {
+        ProxyValidationResult.Text = "正在生成约 1 MiB 本机回环响应并检查原应用关联……";
+        ProxyValidationResult.Text = await proxy.VerifyAsync(async (source, port, token) =>
+        {
+            var result = await ProxyLocalValidation.RunAsync(source, port, token);
+            var reportDirectory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FlowLedger");
+            System.IO.Directory.CreateDirectory(reportDirectory);
+            await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(reportDirectory, "proxy-validation.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { CompletedAtUtc = DateTimeOffset.UtcNow, Result = result },
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), token);
+            return result.Passed ? "本机代理验证通过：响应完整送达，原应用关联及单一 API 增量已确认。此测试不验证 TUN 或公网。" :
+                "本机代理验证未通过：请检查控制器认证、核心进程可见性，以及代理规则是否允许本机回环。没有修改规则或网络设置。";
+        });
+    }
 
     private async void OnStartApplications(object sender, RoutedEventArgs e) => await applications.StartAsync();
 
@@ -102,6 +134,7 @@ public partial class MainWindow : Window
             {
                 monitor.BreakContinuity();
                 await applications.StopAsync(powerBoundary: true);
+                await proxy.StopAsync(powerBoundary: true);
             });
         }
     }
@@ -113,7 +146,7 @@ public partial class MainWindow : Window
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         try
         {
-            await Task.WhenAll(monitor.ShutdownAsync(), applications.ShutdownAsync());
+            await Task.WhenAll(monitor.ShutdownAsync(), applications.ShutdownAsync(), proxy.ShutdownAsync());
         }
         finally
         {

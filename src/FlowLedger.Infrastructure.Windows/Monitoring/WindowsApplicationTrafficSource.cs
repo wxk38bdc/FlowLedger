@@ -23,9 +23,14 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
     private bool stopping;
     private bool lossCounterAvailable;
     private int errorCode;
+    private EtwRecoverySummary? recovery;
+    internal string? SessionName { get; }
 
-    public WindowsApplicationTrafficSource()
+    public WindowsApplicationTrafficSource() : this(Guid.NewGuid()) { }
+
+    internal WindowsApplicationTrafficSource(Guid captureEpoch)
     {
+        epoch = captureEpoch;
         if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
         {
             state = ApplicationCaptureState.AccessDenied;
@@ -36,7 +41,9 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
         TraceEventSession? created = null;
         try
         {
-            created = new TraceEventSession($"FlowLedger.App.{epoch:N}", TraceEventSessionOptions.NoRestartOnCreate)
+            recovery = EtwSessionOwnership.Recover();
+            SessionName = EtwSessionOwnership.CreateName("App", epoch);
+            created = new TraceEventSession(SessionName, TraceEventSessionOptions.NoRestartOnCreate)
             {
                 BufferSizeMB = 64,
                 StopOnDispose = true,
@@ -111,7 +118,7 @@ public sealed class WindowsApplicationTrafficSource : IApplicationTrafficSource
 
             lock (ledgerGate)
             {
-                return new(epoch, state, ledger.Snapshot(), lossCounterAvailable, errorCode);
+                return new(epoch, state, ledger.Snapshot(), lossCounterAvailable, errorCode, recovery);
             }
         }
     }

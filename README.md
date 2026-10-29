@@ -6,7 +6,7 @@ A local network usage ledger for Windows, designed for per-app and per-Wi-Fi tra
 
 [中文说明](README.zh-CN.md) · [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-**Status: application collection validation / pre-alpha.** Live interface rates, opt-in Wi-Fi candidate accounting, and an explicitly enabled ETW per-process prototype are available. Three privileged controlled-loopback rounds passed; broader coverage, Internet/proxy accuracy and sustained performance remain unverified. Persistent history and historical reports are not implemented. This is not a production monitoring tool.
+**Status: collection and proxy association validation / pre-alpha.** Interface/Wi-Fi accounting, opt-in elevated ETW and a Clash/Mihomo proxy ledger are available. Controlled QUIC, sustained TCP, owned-session recovery and local explicit-proxy attribution have passed. WAN/TUN accuracy and long-run stability remain unverified. Persistent traffic history and reports are not implemented.
 
 ## Why FlowLedger?
 
@@ -28,7 +28,7 @@ Physical interface traffic, application traffic, and proxy traffic are related v
 | Startup baselines, resets, gaps, clock changes, and missing measurements | Connected to live interface sessions and covered by automated tests |
 | Per-process TCP/UDP IPv4/IPv6 event usage | Elevated ETW prototype; controlled loopback attribution/bytes validated, wider acceptance pending |
 | Persistent Wi-Fi history and certified switching/roaming behavior | Planned; live switching/roaming/sleep acceptance remains pending |
-| Legacy Clash / Mihomo integration and proxy deduplication | Planned; core/version-specific compatibility |
+| Legacy Clash / Mihomo integration and proxy deduplication | Separate core API ledger and conservative TCP association available; local explicit-proxy tested, full TUN/WAN pending |
 | SSH client and server usage breakdown | Planned; Xshell and OpenSSH are initial validation targets |
 | Local database, daily/weekly/monthly reports, export and quota reminders | Planned |
 | Background Windows service and installer | Planned |
@@ -69,7 +69,15 @@ Optional `--watch-wifi 5` enables notifications and current-connection reads for
 
 On **应用统计**, select **开始应用统计** after manually opening the program as administrator. Each process instance has separate receive/send event-size totals; unknown identities remain separate. Stop retains the snapshot, starting again clears application records, and closing loses all records. Power changes stop application capture and require a manual restart. This view includes loopback/LAN and overlapping proxy legs; it is not an Internet bill or a deduplicated application-to-Wi-Fi mapping.
 
-Optional elevated `--watch-apps 5` prints anonymous ETW process usage and process resource samples; `--verify-apps` checks bounded TCP/UDP IPv4/IPv6 loopback coverage. New `--validate-apps` runs three rounds with isolated child processes, unequal receive/send amounts, short connections and eight concurrent TCP workers, comparing production totals with a second session using typed TraceEvent accessors and known socket delivery. It never contacts an external server or captures packet contents. These controlled local checks passed, including the administrator UI start/stop flow; QUIC, Internet/proxy paths, actual PID reuse and sustained performance are still pending. The reference shares the kernel provider and cannot prove independent event completeness. See the [real-machine report](docs/validation/2026-10-29-etw-loopback.md) and [ADR 0003](docs/decisions/0003-application-etw-validation.md).
+Optional elevated `--watch-apps 5` prints anonymous ETW process usage and process resource samples; `--verify-apps` checks bounded TCP/UDP IPv4/IPv6 loopback coverage. New `--validate-apps` runs three rounds with isolated child processes, unequal receive/send amounts, short connections and eight concurrent TCP workers, comparing production totals with a second session using typed TraceEvent accessors and known socket delivery. It never contacts an external server or captures packet contents. These controlled local checks passed, including the administrator UI start/stop flow; WAN/TUN accuracy, actual PID reuse, forced native loss and long-run stability are still pending. The reference shares the kernel provider and cannot prove independent event completeness. See the [real-machine report](docs/validation/2026-10-29-etw-loopback.md) and [ADR 0003](docs/decisions/0003-application-etw-validation.md).
+
+Later reliability checks added local QUIC v4/v6, three 30-second sustained TCP rounds and recovery after interrupted sessions/crashed helpers. Elevated `--verify-reliability 30` and `--verify-etw-recovery` reproduce these checks. Recovery only matches this user's new-format FlowLedger sessions with demonstrably dead/reused owner processes; active, unconfirmed, foreign and legacy names are untouched. See the [current report](docs/validation/2026-10-29-reliability-proxy.md).
+
+On **代理账本**, enter the HTTP/mixed inbound port (commonly 7890), choose **查找本机控制器**, enter the controller token locally and enable observation. Controller ports differ from inbound ports and can change after core restarts. Tokens stay in memory; no client configs, rules, system-proxy or TUN settings are read/changed. Only `/version` and `/connections` are requested. Stop retains records, restarting clears them, and closing loses usage records.
+
+The core's logical total and partial consecutive-connection deltas remain separate. Each connection is counted once; ETW app/core, loopback, proxy-chain hops and physical bytes are never added. TCP ownership requires matching socket/process-instance evidence on both sides of an API read. UDP, short-lived or mismatched TUN tuples remain unknown. Active snapshots miss initial/tail bytes and complete short connections. **验证本机代理** generates a synthetic 1 MiB loopback response to verify explicit-proxy attribution; it does not validate TUN/WAN. See the [proxy decision](docs/decisions/0004-proxy-accounting.md) and [support matrix](docs/support-matrix.md).
+
+Runtime helper files contain only the per-user random ETW ownership marker and a token-free synthetic proxy-validation summary, not real connection details or usage history. No background service, SQLite history or period reports are implemented.
 
 ## Repository layout
 

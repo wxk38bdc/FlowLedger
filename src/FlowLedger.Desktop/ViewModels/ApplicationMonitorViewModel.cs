@@ -19,6 +19,7 @@ public sealed class ApplicationMonitorViewModel(Func<IApplicationTrafficSource> 
         $"已接收网络事件 {snapshot.Ledger.NetworkEvents}；已知丢失 {snapshot.Ledger.LostEvents}；不支持/异常事件 {snapshot.Ledger.RejectedEvents}。" +
         $"丢失计数{(snapshot.LossCounterAvailable ? "可读（不保证绝无遗漏）" : "不可确认")}。" +
         (snapshot.Ledger.IdentityUncertain || snapshot.Ledger.CapacityReached ? "记录不完整，部分进程身份已失效或达到容量上限。" : "") +
+        (snapshot.Recovery is { } recovery ? $"已回收异常残留会话 {recovery.Recovered}；无法确认 {recovery.Unconfirmed}；回收失败 {recovery.Failed}。" : "") +
         "这是应用网络事件的 size 合计，包含本机回环及局域网；未与网卡或代理用量去重。";
 
     public IReadOnlyList<ApplicationTrafficRow> Rows

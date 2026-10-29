@@ -55,13 +55,29 @@ watch 每秒查询健康计数，1..60 秒后停止自己的唯一命名会话�
 
 verify 仅在权限通过后生成有限本机回环 TCP4/TCP6 各 128 KiB、UDP4/UDP6 各 8 KiB；socket 两端属于同一进程，参考收发各相同。返回四类双向可观察、测试进程归属及质量/守恒结果，失败或不支持 IPv6 视为结论不足。它不验证 size 与 socket 字节相等，不访问公网、不改防火墙或网卡。原始 ETW size 语义及独立同层精度须另验收。
 
-validate 在权限通过后运行三轮，每轮 16 个有限子进程。分别覆盖四类传输的不等量收发、24 次短交换和 8 路 TCP 并发（并发部分每轮共 96 MiB 业务收发量）；所有目标地址硬编码为 loopback。另建 `FlowLedger.Reference.<随机 GUID>` 内存会话，直接用 TraceEvent 类型化 size/PID，不复用生产解码器/账本。每个测试进程须完成送达、退出，并观察到唯一 Start/Stop；排空两条会话后逐实例/协议/方向精确比较 socket 参考、类型化参考和生产账本。任何不符/不支持/质量异常退出 1；全部通过退出 0。输出匿名槽位和合成参考量，不输出 PID/端口或背景流量明细。
+validate 在权限通过后运行三轮，每轮 16 个有限子进程。分别覆盖四类传输的不等量收发、24 次短交换和 8 路 TCP 并发（并发部分每轮共 96 MiB 业务收发量）；所有目标地址硬编码为 loopback。另建 `FlowLedger.Reference.<owner>.<PID>.<创建 ticks>.<GUID>` 内存会话，直接用 TraceEvent 类型化 size/PID，不复用生产解码器/账本。每个测试进程须完成送达、退出，并观察到唯一 Start/Stop；排空两条会话后逐实例/协议/方向精确比较 socket 参考、类型化参考和生产账本。任何不符/不支持/质量异常退出 1；全部通过退出 0。输出匿名槽位和合成参考量，不输出 PID/端口或背景流量明细。
 
 内部 `--app-probe` 工作者仅由 validate 使用：严格限制传输、端口、单次字节、交换数（最多 32）和每进程业务收发总量（最多 16 MiB），等待父进程信号，20 秒超时；没有 ETW 或外部地址参数。父进程为每个探测设 25 秒边界，异常时只清理自己创建的准确子进程和监听器。命令自身不提权、不创建 ETL、不改防火墙/网络配置，也不安装服务。参考和生产共享内核源，不能作为独立的事件送达真值；资源数据包含双消费者及父进程回环服务，不含子进程 CPU 或内核缓冲区。并发吞吐是包含启动/关闭的短时业务吞吐，不是物理网卡带宽或持续采集承诺。方法及结论见[实测记录](validation/2026-10-29-etw-loopback.md)。
 
 测试通过合成元数据和假 ETW 会话验证，不要求 CI 拥有管理员令牌；普通权限测试在已提升 runner 上明确跳过，避免测试隐式创建内核会话。CI 不执行应用原生采集命令。该依赖用途/许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)；完整边界见 [ADR 0003](decisions/0003-application-etw-validation.md)。
 
 单元测试包括领域计数/会话规则、应用协调器的接口隔离和生命周期、Windows SDK ABI、类型/标志分类、Wi-Fi 失败和原生读取，以及真实桌面视图模型的异步启停/退出时序（使用合成数据源，无需创建窗口）。Windows.Tests 因引用 Desktop 使用 Windows Desktop Runtime。CI 额外执行一秒采样，但不要求托管 runner 存在真实物理硬件，不执行 Wi-Fi 名称查询或网络设置操作。
+
+## 可靠性与代理验证
+
+新增管理员有界验收：`--verify-reliability <15..300>` 三轮本机 QUIC v4/v6 + 每轮指定秒数的 4 路持续 TCP + 异常恢复；`--verify-etw-recovery` 单独验证自有会话被中断及自有测试辅助进程被终止后的回收。只终止自己创建的测试进程，不影响用户客户端。QUIC 使用合成证书及固定证书校验，Windows 临时私钥容器正常释放清理，不安装证书/信任或修改 TLS。无权限返回 1，不创建探测；不支持 QUIC 不能算通过。
+
+代理命令（无需自动提权；无法确认核心/应用进程时保守降级）：
+
+```powershell
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --watch-proxy 5 http://127.0.0.1:9090 7890
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-proxy http://127.0.0.1:9090 7890
+dotnet run --project src/FlowLedger.Collector --configuration Release --no-build -- --verify-tcp-owners
+```
+
+示例端口不是自动检测结果。需要认证时，操作者在运行进程的环境中明确提供 `FLOWLEDGER_CONTROLLER_SECRET`；不要放到命令行参数、版本控制或聊天。程序不读取客户端凭据。桌面可用“查找本机控制器”和密钥框。watch 输出匿名分组，核心总量与连接明细独立；无数据/失败/断档/重置/容量不足返回 1。verify-proxy 传输合成 1 MiB loopback HTTP 响应，要求唯一已确认测试原应用及合理 API 增量，失败返回 1；不是 TUN/公网验收。verify-tcp-owners 仅核对真实本机 v4/v6 socket 归属，不输出四元组。非法参数返回 2。
+
+运行辅助文件位于 LocalApplicationData/FlowLedger：`etw-owner.id` 是本用户随机会话标识；桌面 `proxy-validation.json` 只记录合成验证的匿名质量结果，不含密钥或连接明细。CLI 直接输出匿名结果，不写桌面报告。它们不构成流量数据库；关闭仍丢失用量。丢失/损坏 owner 标识时不强行回收旧会话，也不清理其他用户/工具会话。完整边界见 [ADR 0004](decisions/0004-proxy-accounting.md)。
 
 ## 本地桌面版本
 

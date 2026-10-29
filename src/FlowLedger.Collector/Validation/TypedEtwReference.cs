@@ -1,4 +1,5 @@
 using FlowLedger.Domain.Accounting;
+using FlowLedger.Infrastructure.Windows.Monitoring;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
@@ -25,7 +26,7 @@ internal sealed class TypedEtwReference : IAsyncDisposable
 
     public TypedEtwReference()
     {
-        session = new TraceEventSession($"FlowLedger.Reference.{Guid.NewGuid():N}", TraceEventSessionOptions.NoRestartOnCreate)
+        session = new TraceEventSession(EtwSessionOwnership.CreateName("Reference", Guid.NewGuid()), TraceEventSessionOptions.NoRestartOnCreate)
         {
             BufferSizeMB = 64,
             StopOnDispose = true,

@@ -4,7 +4,7 @@ FlowLedger remains licensed under [Apache-2.0](LICENSE). Dependencies retain the
 
 ## Microsoft.Diagnostics.Tracing.TraceEvent 4.0.0
 
-Purpose: decode Windows kernel process and TCP/UDP network metadata and manage explicitly enabled real-time ETW sessions. Referenced only by the Windows infrastructure project. Package author: Microsoft. Project: [microsoft/perfview, v4.0.0](https://github.com/microsoft/perfview/tree/v4.0.0). Package license: MIT.
+Purpose: decode Windows kernel process and TCP/UDP network metadata and manage explicitly enabled real-time ETW sessions. The Windows infrastructure project owns the direct package reference; the Collector also uses its transitive API for independent typed validation and owned-session recovery tests. Package author: Microsoft. Project: [microsoft/perfview, v4.0.0](https://github.com/microsoft/perfview/tree/v4.0.0). Package license: MIT.
 
 Upstream [LICENSE.TXT](https://github.com/microsoft/perfview/blob/v4.0.0/LICENSE.TXT):
 
